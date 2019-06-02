@@ -1,7 +1,9 @@
 # NodeJS Twitch IRC bot for SaltyTeemo
-A simple IRC bot for the SaltyTeemo livestream on Twitch, built with Node.JS.
+A simple IRC bot for the SaltyTeemo livestream on Twitch built with Node.JS
 
 ### Getting Started
+Clone this repository: `git clone https://github.com/knakamura13/node-js-twitch-irc-bot-for-saltyteemo twitch-bot-js && cd twitch-bot-js`
+ 
 Install NodeJS for your system: https://nodejs.org/en/download/
 
 Install the project dependencies: `npm install`

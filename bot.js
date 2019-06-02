@@ -127,8 +127,8 @@ function handleSaltbotMessage(channel, message) {
         let _blue = colors.blueBright(totals.blue.mushrooms.toLocaleString());
         let _red = colors.redBright(totals.red.mushrooms.toLocaleString());
 
-        log(colors.whiteBright(`Betting open for ${seconds} seconds`));
-        log(`${_blue} | ${_red}`);
+        log(`Betting open (${seconds} s)`);
+        log(`${_blue} | ${_red}\n`);
     }
 
     // Betting is over OR 300 seconds have elapsed.
@@ -141,12 +141,12 @@ function handleSaltbotMessage(channel, message) {
         betComplete = false;
         bettingStarted = false;
 
-        log(colors.gray("Betting has ended"));
+        log(colors.gray("\nBetting has ended\n"));
     }
 }
 
 function handleMyMessage(channel, username, message) {
-    log(`<${colors.cyanBright(username)}> ${message}`);
+    log(`\n<${colors.cyanBright(username)}> ${message}\n`);
 }
 
 function handleOtherMessage(channel, username, message) {
@@ -173,4 +173,4 @@ client.on('chat', (channel, userstate, message, self) => {
 
 console.clear();
 client.connect();
-log(colors.greenBright("Connection established!\n"));
+log(colors.greenBright("Connection established\n"));
