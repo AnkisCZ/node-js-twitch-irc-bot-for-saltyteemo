@@ -17,6 +17,13 @@ const channel = 'saltyteemo';
 const oAuthToken = process.env.TWITCH_PASSWORD;
 const oAuthUsername = process.env.TWITCH_USERNAME;
 
+if (typeof oAuthToken === 'undefined'
+    || typeof oAuthUsername === 'undefined'
+    || oAuthToken.length < 1
+    || oAuthUsername.length < 1) {
+    throw 'Invalid username or token';
+}
+
 // Create an instance of TwitchJS.
 const { chat } = new TwitchJS({ 'username': oAuthUsername, 'token': oAuthToken });
 
