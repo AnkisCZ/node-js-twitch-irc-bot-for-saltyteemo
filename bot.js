@@ -22,7 +22,7 @@ if (oAuthToken.length < 36)
     throw colors.red(`TwitchTokenException: Invalid Twitch token: '${oAuthToken}'\n`);
 
 // Create an instance of TwitchJS.
-const { chat } = new TwitchJS({ 'username': oAuthUsername, 'token': oAuthToken });
+const { chat } = new TwitchJS({ 'username': oAuthUsername, 'token': oAuthToken, log: { level: 0 } });
 
 // Extend TwitchJS functionality.
 chat.say = function (message) {
