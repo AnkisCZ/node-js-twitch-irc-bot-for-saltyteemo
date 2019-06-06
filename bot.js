@@ -1,67 +1,103 @@
-/* MARK: General Setup */
-
-const player = require('play-sound')(opts = {});
-
-const colors = require('chalk');
+// MARK: Library Imports & Setup
 
 const log = console.log;
-
+const player = require('play-sound')(opts = {});
+const colors = require('chalk');
 const dotenv = require('dotenv');
 dotenv.config();
 
 
-/* MARK: IRC Initialization */
+// MARK: TwitchJS Setup
 
-const TwitchJS = require('twitch-js');
+// Import TwitchJS.
+const TwitchJS = require('twitch-js').default;
 
-const options = {
-    channels: ["#saltyteemo"],
-    identity: {
-        username: process.env.TWITCH_USERNAME,
-        password: process.env.TWITCH_PASSWORD
-    },
+// Set connection options.
+const channel = 'saltyteemo';
+const oAuthToken = process.env.TWITCH_PASSWORD;
+const oAuthUsername = process.env.TWITCH_USERNAME;
+
+// Create an instance of TwitchJS.
+const { chat } = new TwitchJS({ 'username': oAuthUsername, 'token': oAuthToken });
+
+// Extend TwitchJS functionality.
+chat.say = function (message) {
+    setTimeout(function () {
+        chat.send(`PRIVMSG #${channel} :${message}`)
+    }, 1000)
 };
 
-const client = new TwitchJS.client(options);
 
-
-/* MARK: Global Properties */
+// MARK: Global Properties
 
 let totals = {
-    "blue": {
-        "mushrooms": 0,
-        "bets": 0,
+    'blue': {
+        'mushrooms': 0,
+        'bets': 0,
     },
-    "red": {
-        "mushrooms": 0,
-        "bets": 0,
+    'red': {
+        'mushrooms': 0,
+        'bets': 0,
     },
 };
 
 let timers = {
-    "firstBet": process.hrtime(),
-    "!collect": process.hrtime(),
+    'firstBet': process.hrtime(),
+    '!collect': process.hrtime(),
 };
-
-let bettingStarted = false;
 
 let betComplete = false;
 
+let myTeam = '';
 
-/* MARK: General Functions */
+let myBet;
+
+let commands = {
+    '!test': function() {
+        chat.say(`@${oAuthUsername} I hear you MrDestructoid`)
+    },
+    '!catfact': function() {
+        chat.say(`@${oAuthUsername} Sorry, I'm all out of cat facts`);
+    },
+    collect: function() {
+        chat.say('!collect');
+        timers['!collect'] = process.hrtime();
+    },
+    bet: function(team, amount) {
+        chat.say(`!${team} ${amount}`);
+        betComplete = true;
+    }
+};
+
+
+// MARK: General Functions
+
+// Reset global properties when betting is over.
+function notifyBettingEnded() {
+    totals.blue.mushrooms = 0;
+    totals.red.mushrooms = 0;
+    totals.blue.bets = 0;
+    totals.red.bets = 0;
+    betComplete = false;
+    log(colors.gray('Betting has ended\n'));
+}
+
+function isBettingOpen() {
+    return (totals.blue.mushrooms > 0 || totals.red.mushrooms > 0)
+}
 
 // Once per second, check how long betting has been open.
 setInterval(() => {
-    // 170 seconds since betting started.
-    if (process.hrtime(timers.firstBet)[0] > 170 && bettingStarted && !betComplete) {
+    // 180 seconds since betting started.
+    if (process.hrtime(timers.firstBet)[0] > 180 && !betComplete && isBettingOpen()) {
         // Check which team is in the lead.
         let higher = {};
         let lower = {};
         let blue = totals.blue;
         let red = totals.red;
-        blue.name = "blue";
-        red.name = "red";
-        
+        blue.name = 'blue';
+        red.name = 'red';
+
         if (red.mushrooms > blue.mushrooms) {
             higher = red;
             lower = blue;
@@ -70,107 +106,102 @@ setInterval(() => {
             lower = red;
         }
 
-        let myTeam = lower.name;
-        let myBet = 5000 + Math.floor(Math.random() * 10);
+        myTeam = lower.name;
+        myBet = 6000 + Math.floor(Math.random() * 10);
 
-        client.say(options.channels[0], `!${myTeam} ${myBet}`);
+        if (myBet > lower.mushrooms) {
+            myBet = lower.mushrooms;
+        } else if (higher.mushrooms - lower.mushrooms < 1000) {
+            myBet = 1000 + Math.floor(Math.random() * 10);
+        } else if (higher.mushrooms - lower.mushrooms < 5000) {
+            myBet = 3000 + Math.floor(Math.random() * 10);
+        }
 
-        betComplete = true;
-        bettingStarted = false;
+        commands.bet(myTeam, myBet);
     }
 
     // 60 minutes since last !collect.
-    if (process.hrtime(timers["!collect"])[0] > 3600) {
-        client.say(options.channels[0], `!collect`);
-        timers["!collect"] = process.hrtime();
+    if (process.hrtime(timers['!collect'])[0] > 3600) {
+        commands.collect();
     }
 
     // Betting has been open for over 4 minutes.
-    if ((totals.blue.mushrooms > 0 || totals.red.mushrooms > 0) && process.hrtime(timers.firstBet)[0] > 240) {
-        // Reset global properties.
-        totals.blue.mushrooms = 0;
-        totals.blue.bets = 0;
-        totals.red.mushrooms = 0;
-        totals.red.bets = 0;
-        betComplete = false;
-        bettingStarted = false;
-
-        log(colors.gray("Betting has ended"));
+    if (process.hrtime(timers.firstBet)[0] > 240 && isBettingOpen()) {
+        notifyBettingEnded();
     }
 }, 1000);
 
 
-/* MARK: Event Handlers */
+// MARK: Message Handling Functions
 
-function handleSaltbotMessage(channel, message) {
+// Handle any message sent by Saltbot.
+function handleSaltbotMessage(channel, username, message) {
     // Message contains a processed bet.
-    if (message.includes("Bet complete for")) {
+    if (message.includes('Bet complete for')) {
         // First bet of the game.
-        if (totals.blue.mushrooms === 0 && totals.red.mushrooms === 0) {
+        if (!isBettingOpen()) {
+            // Record time of first bet.
             timers.firstBet = process.hrtime();
-            bettingStarted = true;
 
             // Play audio file.
-            player.play("teemo.mp3", function(err) {
+            player.play('teemo.mp3', function(err) {
                 if (err && !err.killed) throw err;
             });
         }
 
-        const bet = message.split("Bet complete for ")[1].split(". Your new balance is")[0].toLowerCase().split(", ");
+        // Parse information from message.
+        const bet = message.split('Bet complete for ')[1].split('. Your new balance is')[0].toLowerCase().split(', ');
         const team = bet[0];
         const mushrooms = parseInt(bet[1]);
 
+        // Update totals for mushrooms and bets.
         totals[team].mushrooms += mushrooms;
         totals[team].bets += 1;
 
         let seconds = process.hrtime(timers.firstBet)[0];
-        let _blue = colors.blueBright(totals.blue.mushrooms.toLocaleString());
-        let _red = colors.redBright(totals.red.mushrooms.toLocaleString());
+        let _blueTotal = colors.blueBright(totals.blue.mushrooms.toLocaleString());
+        let _redTotal = colors.redBright(totals.red.mushrooms.toLocaleString());
 
         log(`Betting open (${seconds} s)`);
-        log(`${_blue} | ${_red}\n`);
+        log(`${_blueTotal} | ${_redTotal}\n`);
     }
 
-    // Betting is over OR 300 seconds have elapsed.
-    if ((totals.blue.mushrooms > 0 || totals.red.mushrooms > 0) && message.includes("Betting has ended")) {
-        // Reset global properties.
-        totals.blue.mushrooms = 0;
-        totals.blue.bets = 0;
-        totals.red.mushrooms = 0;
-        totals.red.bets = 0;
-        betComplete = false;
-        bettingStarted = false;
-
-        log(colors.gray("\nBetting has ended\n"));
+    // Betting is over.
+    if (message.includes('Betting has ended') && isBettingOpen()) {
+        notifyBettingEnded();
     }
 }
 
+// Handle any message sent by my own account.
 function handleMyMessage(channel, username, message) {
-    log(`\n<${colors.cyanBright(username)}> ${message}\n`);
+    log(`<${colors.cyanBright(username)}> ${message}`);
+
+    if (typeof commands.message === 'function') {
+        commands.message()
+    }
 }
 
-function handleOtherMessage(channel, username, message) {
-}
-
-client.on('chat', (channel, userstate, message, self) => {
-    const username = userstate["display-name"];
-
-    switch (username) {
-        case "xxsaltbotxx":
-            handleSaltbotMessage(channel, message);
+// Delegate all messages to other message handling functions.
+function delegateMessage(msg) {
+    switch (msg.username) {
+        case 'xxsaltbotxx':
+            handleSaltbotMessage(channel, msg.username, msg.message);
             break;
-        case "Chuby1Tubby":
-            handleMyMessage(channel, username, message);
+        case oAuthUsername:
+            handleMyMessage(channel, msg.username, msg.message);
             break;
         default:
-            handleOtherMessage(channel, username, message);
             break;
     }
+}
+
+
+// MARK: TwitchJS Events and Methods
+
+// Listen for all user and bot messages.
+chat.on('PRIVMSG', delegateMessage);
+
+// Connect to IRC and join the channel.
+chat.connect().then(() => {
+    chat.join(channel);
 });
-
-
-/* MARK: Establish Connection */
-
-console.clear();
-client.connect();
-log(colors.greenBright("Connection established\n"));
