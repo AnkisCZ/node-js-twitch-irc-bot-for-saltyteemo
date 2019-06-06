@@ -1,7 +1,7 @@
 {
   "name": "twitch-bot",
-  "version": "1.0.0",
-  "description": "Simple IRC betting bot for the SaltyTeemo live stream on Twitch.",
+  "version": "2.0.0",
+  "description": "A simple, yet elegant betting bot for the SaltyTeemo Twitch stream built using NodeJS and IRC.",
   "main": "bot.js",
   "dependencies": {
     "chalk": "^2.4.2",
