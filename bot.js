@@ -98,7 +98,7 @@ function logCurrentTotals() {
     let _redMushrooms = colors.redBright(totals.red.mushrooms.toLocaleString());
     let _blueBets = colors.blueBright(`(${totals.blue.bets} bets)`);
     let _redBets = colors.redBright(`(${totals.red.bets} bets)`);
-    console.log(`[${seconds}s] ${_blueMushrooms} (${_blueBets} bets) | ${_redMushrooms} (${_redBets} bets)`)
+    console.log(`${_blueMushrooms} ${_blueBets} | ${_redMushrooms} ${_redBets} \t[${seconds} seconds]`)
 }
 
 // Resets global betting properties and logs the time.
