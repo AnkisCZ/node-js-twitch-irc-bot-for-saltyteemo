@@ -3,9 +3,11 @@
   "version": "2.0.0",
   "description": "A simple, yet elegant betting bot for the SaltyTeemo Twitch stream built using NodeJS and IRC.",
   "main": "bot.js",
+  "repository": "https://github.com/knakamura13/node-js-twitch-irc-bot-for-saltyteemo",
   "dependencies": {
     "chalk": "^2.4.2",
     "dotenv": "^8.0.0",
+    "pad": "^3.2.0",
     "play-sound": "^1.1.3",
     "twitch-js": "^2.0.0-beta.30"
   },

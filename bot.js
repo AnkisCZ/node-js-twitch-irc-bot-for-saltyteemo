@@ -3,6 +3,7 @@
  *******************/
 
 require('dotenv').config();
+const pad = require('pad');
 const colors = require('chalk');
 const TwitchJS = require('twitch-js').default;
 const player = require('play-sound')(opts = {});
@@ -22,6 +23,8 @@ if (oAuthToken.length < 36)
     throw colors.red(`TwitchTokenException: Invalid Twitch token: '${oAuthToken}'\n`);
 
 // Create an instance of TwitchJS.
+console.clear();
+console.log(colors.yellowBright('\nConnecting...'));
 const { chat } = new TwitchJS({ 'username': oAuthUsername, 'token': oAuthToken, log: { level: 0 } });
 
 // Extend TwitchJS functionality.
@@ -56,6 +59,8 @@ let timers = {
 let betComplete = false;
 
 let myTeam = '';
+
+let opposingTeam = '';
 
 let myBet;
 
@@ -93,24 +98,35 @@ function isBettingOpen() {
 
 // Logs the current time with the total mushrooms and bets for each team.
 function logCurrentTotals() {
-    let seconds = process.hrtime(timers.firstBet)[0];
+    let seconds = '[' + process.hrtime(timers.firstBet)[0] + ' seconds]';
     let _blueMushrooms = colors.blueBright(totals.blue.mushrooms.toLocaleString());
-    let _redMushrooms = colors.redBright(totals.red.mushrooms.toLocaleString());
     let _blueBets = colors.blueBright(`(${totals.blue.bets} bets)`);
+    let _blue = _blueMushrooms + ' ' + _blueBets;
+    let _redMushrooms = colors.redBright(totals.red.mushrooms.toLocaleString());
     let _redBets = colors.redBright(`(${totals.red.bets} bets)`);
-    console.log(`${_blueMushrooms} ${_blueBets} | ${_redMushrooms} ${_redBets} \t[${seconds} seconds]`)
+    let _red = _redMushrooms + ' ' + _redBets;
+
+    console.log(`${pad(20, _blue)} | ${pad(_red, 20)} ${pad(20, seconds)}`)
 }
 
-// Resets global betting properties and logs the time.
+// Resets global betting properties and logs the time and other information.
 function notifyBettingEnded() {
-    totals.blue.mushrooms = 0;
-    totals.red.mushrooms = 0;
-    totals.blue.bets = 0;
-    totals.red.bets = 0;
+    console.log(colors.gray(`\n[${getFormattedTime()}] Betting has ended\n`));
+    try {
+        console.log(`Your bet:\t!${myTeam} ${myBet}`);
+        console.log(`Profit:  \t${myBet.toLocaleString()} * ${totals[myTeam].mushrooms.toLocaleString()} / ${totals[opposingTeam].mushrooms.toLocaleString()} = ${Math.floor(myBet * totals[myTeam].mushrooms / totals[opposingTeam].mushrooms).toLocaleString()} mushrooms\n`);
+    } catch (err) {}
+    myBet = 0;
+    myTeam = '';
+    opposingTeam = '';
     betComplete = false;
-    console.log(colors.gray(`\n[${getFormattedTime()}] Betting has ended\n`))
+    totals.red.bets = 0;
+    totals.blue.bets = 0;
+    totals.red.mushrooms = 0;
+    totals.blue.mushrooms = 0
 }
 
+// Decide how much to bet and which team to bet on.
 function calculateBet() {
     let higher = {};
     let lower = {};
@@ -130,6 +146,7 @@ function calculateBet() {
 
     // Determine team and amount to bet.
     myTeam = lower.name;
+    opposingTeam = higher.name;
     myBet = 5000 + Math.floor(Math.random() * 5);
 
     // Check if the bet amount is needlessly high.
@@ -148,15 +165,15 @@ function initTimers() {
         let _secondsSinceFirstBet = process.hrtime(timers.firstBet)[0];
 
         // 60 minutes since last !collect.
-        if (_secondsSinceCollect > 3600)
+        if (_secondsSinceCollect >= 10800)
             commands.collect();
 
-        // 4 minutes since betting started.
-        if (_secondsSinceFirstBet > 240 && isBettingOpen())
+        // 5.5 minutes since betting started.
+        if (_secondsSinceFirstBet >= 330 && isBettingOpen())
             notifyBettingEnded();
 
         // 3 minutes since betting started.
-        if (_secondsSinceFirstBet > 180 && !betComplete && isBettingOpen()) {
+        if (_secondsSinceFirstBet >= 180 && !betComplete && isBettingOpen()) {
             calculateBet();
             commands.bet(myTeam, myBet)
         }
@@ -179,7 +196,7 @@ function handleSaltbotMessage(channel, username, message) {
             // Play audio file.
             player.play('teemo.mp3', function(err) { if (err && !err.killed) throw err });
 
-            console.log(colors.greenBright(`\n[${getFormattedTime()}] Betting has started`))
+            console.log(colors.greenBright(`\n[${getFormattedTime()}] Betting has started\n`))
         }
 
         // Parse information from message.
@@ -190,6 +207,15 @@ function handleSaltbotMessage(channel, username, message) {
         // Update totals for mushrooms and bets.
         totals[team].mushrooms += mushrooms;
         totals[team].bets += 1;
+
+        // Check if bet was sent by my account.
+        if (message.toLowerCase().includes(oAuthUsername)) {
+            console.log(colors.grey(`\n[${getFormattedTime()}] Bet received\n`));
+            myTeam = team;
+            opposingTeam = (myTeam === 'red') ? 'blue' : 'red';
+            myBet = mushrooms;
+            betComplete = true;
+        }
 
         logCurrentTotals()
     }
@@ -209,6 +235,24 @@ function handleMyMessage(channel, username, message) {
         commands[message]()
 }
 
+// Handle any message sent from any user other than those that are already handled.
+function handleOtherMessage(channel, username, message) {
+    // Message contains an @ mention.
+    if (message.toLowerCase().includes('@' + oAuthUsername)) {
+        let iterableMessage = message.split(" ");
+        let copyMessage = '';
+
+        for (let word of iterableMessage) {
+            if (word.toLowerCase().contains('@' + oAuthUsername)) {
+                word = colors.bgWhite(word);
+                copyMessage += " " + word
+            }
+        }
+
+        console.log(colors.bgRed(`[${getFormattedTime()}] <${(username)}> ${copyMessage}`))
+    }
+}
+
 
 /*************************
  * TwitchJS Finalization *
@@ -219,13 +263,18 @@ chat.on('PRIVMSG', (msg) => {
     let params = [channel, msg.username, msg.message];
 
     switch (msg.username) {
-        case 'xxsaltbotxx': handleSaltbotMessage(...params); break;
-        case oAuthUsername: handleMyMessage(...params)
+        case 'xxsaltbotxx':
+            handleSaltbotMessage(...params); break;
+        case oAuthUsername:
+            handleMyMessage(...params); break;
+        default:
+            handleOtherMessage(...params)
     }
 });
 
 // Connect to IRC and join the channel.
 chat.connect().then(() => {
     chat.join(channel);
-    initTimers()
+    initTimers();
+    console.log(colors.greenBright('Connection established\n'));
 });

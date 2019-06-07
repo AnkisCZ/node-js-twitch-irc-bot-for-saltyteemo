@@ -8,10 +8,11 @@ Install NodeJS for your system: https://nodejs.org/en/download/
 
 Install the project dependencies: `npm install`
 * Dependencies used in this project:
+    * "pad": "^3.2.0"
     * "chalk": "^2.4.2"
     * "dotenv": "^8.0.0"
-    * "play-sound": "^1.1.3"
     * "twitch-js": "^1.2.17"
+    * "play-sound": "^1.1.3"
 
 Open the `.env` file and modify the `TWITCH_USERNAME` and `TWITCH_PASSWORD` placeholder values
 * Your username should be all lowercase; i.e. `SaltyTeemo` should be written as `saltyteemo`
