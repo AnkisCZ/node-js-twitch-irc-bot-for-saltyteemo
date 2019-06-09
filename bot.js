@@ -68,11 +68,8 @@ let commands = {
     '!test': function() {
         chat.say(`@${oAuthUsername} I hear you MrDestructoid`)
     },
-    '!catfact': function() {
-        chat.say(`@${oAuthUsername} Sorry, I'm all out of cat facts`)
-    },
     collect: function() {
-        chat.say('!collect');
+        chat.say('!farm');
         timers['!collect'] = process.hrtime()
     },
     bet: function(team, amount) {
@@ -97,25 +94,35 @@ function isBettingOpen() {
 }
 
 // Logs the current time with the total mushrooms and bets for each team.
-function logCurrentTotals() {
+function logCurrentTotals(isLargeBet, team, mushrooms, user) {
     let seconds = '[' + process.hrtime(timers.firstBet)[0] + ' seconds]';
     let _blueMushrooms = colors.blueBright(totals.blue.mushrooms.toLocaleString());
     let _blueBets = colors.blueBright(`(${totals.blue.bets} bets)`);
-    let _blue = _blueMushrooms + ' ' + _blueBets;
     let _redMushrooms = colors.redBright(totals.red.mushrooms.toLocaleString());
     let _redBets = colors.redBright(`(${totals.red.bets} bets)`);
+    let _blue = _blueMushrooms + ' ' + _blueBets;
     let _red = _redMushrooms + ' ' + _redBets;
 
-    console.log(`${pad(20, _blue)} | ${pad(_red, 20)} ${pad(20, seconds)}`)
+    let _extra = '';
+    if (isLargeBet)
+        _extra = ` <--  ${Math.floor(mushrooms / 1000)}k on ${ eval('colors.' + team + 'Bright(team)')} from ${user}`;
+
+    console.log(pad(_blue, 34) + ' | ' + pad(pad(34, _red), 33) + pad(16, seconds) + colors.bold(_extra))
 }
 
 // Resets global betting properties and logs the time and other information.
 function notifyBettingEnded() {
     console.log(colors.gray(`\n[${getFormattedTime()}] Betting has ended\n`));
     try {
-        console.log(`Your bet:\t!${myTeam} ${myBet}`);
-        console.log(`Profit:  \t${myBet.toLocaleString()} * ${totals[myTeam].mushrooms.toLocaleString()} / ${totals[opposingTeam].mushrooms.toLocaleString()} = ${Math.floor(myBet * totals[myTeam].mushrooms / totals[opposingTeam].mushrooms).toLocaleString()} mushrooms\n`);
+        let profit = Math.floor(myBet / totals[myTeam].mushrooms * totals[opposingTeam].mushrooms);
+        let gross = profit + myBet;
+        profit = profit.toLocaleString();
+        gross = gross.toLocaleString();
+
+        console.log(`Your bet: !${myTeam} ${myBet}`);
+        console.log(`Winnings: +${gross} mushrooms (${profit} profit)\n`);
     } catch (err) {}
+
     myBet = 0;
     myTeam = '';
     opposingTeam = '';
@@ -147,7 +154,7 @@ function calculateBet() {
     // Determine team and amount to bet.
     myTeam = lower.name;
     opposingTeam = higher.name;
-    myBet = 5000 + Math.floor(Math.random() * 5);
+    myBet = 7000 + Math.floor(Math.random() * 10);  // Random int between 7000 and 7010
 
     // Check if the bet amount is needlessly high.
     if (myBet > lower.mushrooms)
@@ -165,7 +172,7 @@ function initTimers() {
         let _secondsSinceFirstBet = process.hrtime(timers.firstBet)[0];
 
         // 60 minutes since last !collect.
-        if (_secondsSinceCollect >= 10800)
+        if (_secondsSinceCollect >= 3600)
             commands.collect();
 
         // 5.5 minutes since betting started.
@@ -187,7 +194,7 @@ function initTimers() {
 
 // Handle any message sent by xxsaltbotxx.
 function handleSaltbotMessage(channel, username, message) {
-    // Message contains a processed bet.
+    // Message includes a processed bet.
     if (message.includes('Bet complete for')) {
         if (!isBettingOpen()) {
             // Record time of first bet.
@@ -208,23 +215,28 @@ function handleSaltbotMessage(channel, username, message) {
         totals[team].mushrooms += mushrooms;
         totals[team].bets += 1;
 
+        // Check which user submitted the bet.
+        let betting_user = '';
+        for (let word of message.split(" ")) {
+            if (word.toLowerCase().includes('@'))
+                betting_user = word.replace("@", "")
+        }
+
         // Check if bet was sent by my account.
-        if (message.toLowerCase().includes(oAuthUsername)) {
+        if (betting_user.toLowerCase() === oAuthUsername) {
             console.log(colors.grey(`\n[${getFormattedTime()}] Bet received\n`));
             myTeam = team;
             opposingTeam = (myTeam === 'red') ? 'blue' : 'red';
             myBet = mushrooms;
-            betComplete = true;
+            betComplete = true
         }
 
-        logCurrentTotals()
+        logCurrentTotals(mushrooms >= 20000, team, mushrooms, betting_user)
     }
 
     // Betting is over.
-    if (message.includes('Betting has ended') && isBettingOpen()) {
-        logCurrentTotals();
-        notifyBettingEnded()
-    }
+    if (message.includes('Betting has ended') && isBettingOpen())
+        notifyBettingEnded();
 }
 
 // Handle any message sent by my own account.
@@ -237,16 +249,15 @@ function handleMyMessage(channel, username, message) {
 
 // Handle any message sent from any user other than those that are already handled.
 function handleOtherMessage(channel, username, message) {
-    // Message contains an @ mention.
+    // Message includes an @ mention.
     if (message.toLowerCase().includes('@' + oAuthUsername)) {
         let iterableMessage = message.split(" ");
         let copyMessage = '';
 
-        for (let word of iterableMessage) {
-            if (word.toLowerCase().contains('@' + oAuthUsername)) {
-                word = colors.bgWhite(word);
-                copyMessage += " " + word
-            }
+        for (let [index, word] of iterableMessage.entries()) {
+            if (word.toLowerCase().includes('@' + oAuthUsername)) word = colors.whiteBright.bold(word);
+            if (index > 0) copyMessage += " ";
+            copyMessage += word
         }
 
         console.log(colors.bgRed(`[${getFormattedTime()}] <${(username)}> ${copyMessage}`))
@@ -276,5 +287,5 @@ chat.on('PRIVMSG', (msg) => {
 chat.connect().then(() => {
     chat.join(channel);
     initTimers();
-    console.log(colors.greenBright('Connection established\n'));
+    console.log(colors.greenBright('Connection established\n'))
 });
