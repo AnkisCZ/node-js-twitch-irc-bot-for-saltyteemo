@@ -104,8 +104,15 @@ function logCurrentTotals(isLargeBet, team, mushrooms, user) {
     let _red = _redMushrooms + ' ' + _redBets;
 
     let _extra = '';
-    if (isLargeBet)
-        _extra = ` <--  ${Math.floor(mushrooms / 1000)}k on ${ eval('colors.' + team + 'Bright(team)')} from ${user}`;
+    if (isLargeBet) {
+        // Add extra text to show the large bet and the username.
+        _extra = ` <--  ${Math.floor(mushrooms / 1000)}k on ${eval('colors.' + team + 'Bright(team)')} from ${user}`;
+
+        if (mushrooms >= 200000) {
+            // Play audio file.
+            player.play('media/nani.mp3', function(err) { if (err && !err.killed) throw err })
+        }
+    }
 
     console.log(pad(_blue, 34) + ' | ' + pad(pad(34, _red), 33) + pad(16, seconds) + colors.bold(_extra))
 }
@@ -201,7 +208,7 @@ function handleSaltbotMessage(channel, username, message) {
             timers.firstBet = process.hrtime();
 
             // Play audio file.
-            player.play('teemo.mp3', function(err) { if (err && !err.killed) throw err });
+            player.play('media/teemo.mp3', function(err) { if (err && !err.killed) throw err });
 
             console.log(colors.greenBright(`\n[${getFormattedTime()}] Betting has started\n`))
         }
