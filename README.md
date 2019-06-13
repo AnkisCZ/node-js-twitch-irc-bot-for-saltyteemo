@@ -11,7 +11,7 @@ Install the project dependencies: `npm install`
     * "pad": "^3.2.0"
     * "chalk": "^2.4.2"
     * "dotenv": "^8.0.0"
-    * "twitch-js": "^1.2.17"
+    * "twitch-js": "^2.0.0-beta.30"
     * "play-sound": "^1.1.3"
 
 Open the `.env` file and modify the `TWITCH_USERNAME` and `TWITCH_PASSWORD` placeholder values
