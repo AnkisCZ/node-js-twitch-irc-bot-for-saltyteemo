@@ -50,7 +50,7 @@ console.log(colors.yellowBright('\nConnecting...'));
 const { chat } = new TwitchJS({ 'username': preferences.credentials.username, 'token': preferences.credentials.token, log: { level: 0 } });
 
 // Extend TwitchJS functionality.
-chat.say = function (message) {
+chat.say = function (mostRecentChannel, message) {
     setTimeout(function () {
         chat.send(`PRIVMSG #${mostRecentChannel} :${message}`);
         console.log(`[${getFormattedTime()}] <${colors.cyanBright(preferences.credentials.username)}> ${message}`)
