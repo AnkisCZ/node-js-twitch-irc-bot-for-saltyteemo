@@ -11,10 +11,18 @@ Install the project dependencies: `npm install`
     * "pad": "^3.2.0"
     * "chalk": "^2.4.2"
     * "dotenv": "^8.0.0"
-    * "twitch-js": "^1.2.17"
+    * "twitch-js": "^2.0.0-beta.30"
     * "play-sound": "^1.1.3"
 
-Open the `.env` file and modify the `TWITCH_USERNAME` and `TWITCH_PASSWORD` placeholder values
+Open the `.env` file and add the following two lines,
+replacing the placeholders with your credentials:
+```
+TWITCH_USERNAME=yourusername
+TWITCH_PASSWORD=yourpassword
+```
+* The file is probably hidden on your system. Use the command line/Terminal to open the file:
+    * Windows: `Notepad .env`
+    * MacOS: `open .env`
 * Your username should be all lowercase; i.e. `SaltyTeemo` should be written as `saltyteemo`
 * You can get your password (API key) from http://twitchapps.com/tmi/
 
