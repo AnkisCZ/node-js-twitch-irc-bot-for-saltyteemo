@@ -28,14 +28,14 @@ const preferences = {
         collect: 3600,
         botResponse: 1000
     },
-    betAmount: 1000 + Math.floor(Math.random() * 9),    // Random number between 1,000 and 1,009
+    betAmount: 3000 + Math.floor(Math.random() * 9),    // Random number between 1,000 and 1,009
     alertSounds: {
         bettingStarted: 'media/teemo.mp3',
         largeBet: 'media/nani.mp3'
     },
     largeBetThresholds: {
         regular: 25000,
-        massive: 200000
+        massive: 150000
     }
 };
 
@@ -53,7 +53,6 @@ const { chat } = new TwitchJS({ 'username': preferences.credentials.username, 't
 chat.say = function (mostRecentChannel, message) {
     setTimeout(function () {
         chat.send(`PRIVMSG #${mostRecentChannel} :${message}`);
-        console.log(`[${getFormattedTime()}] <${colors.cyanBright(preferences.credentials.username)}> ${message}`)
     }, preferences.delays.botResponse)
 };
 
