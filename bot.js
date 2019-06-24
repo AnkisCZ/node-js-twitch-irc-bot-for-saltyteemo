@@ -28,7 +28,7 @@ const preferences = {
         farm: 7200,
         botResponseDefault: 0
     },
-    betAmount: 3000 + Math.floor(Math.random() * 5),
+    betAmount: 2000 + Math.floor(Math.random() * 5),
     fileNames: {
         bettingStartedSound: 'media/teemo.mp3',
         largeBetSound: 'media/nani.mp3',
@@ -36,9 +36,11 @@ const preferences = {
         balanceHistoryDB: 'balanceHistory.json'
     },
     largeBetThresholds: {
+        tiny: 2,
         regular: 30000,
         massive: 100000
-    }
+    },
+    chatColor: '#ff77ff'
 };
 
 
@@ -47,14 +49,11 @@ const preferences = {
  ******************/
 
 // Create an instance of TwitchJS.
-const { chat } = new TwitchJS({ 'username': preferences.credentials.username, 'token': preferences.credentials.token, log: { level: 0 } });
-
-// Extend TwitchJS functionality.
-chat.say = function (mostRecentChannel, message, botResponse = preferences.delays.botResponseDefault) {
-    setTimeout(function () {
-        chat.send(`PRIVMSG #${mostRecentChannel} :${message}`)
-    }, botResponse)
-};
+const { chat } = new TwitchJS({
+    username: preferences.credentials.username,
+    token: preferences.credentials.token,
+    log: { level: 0 }
+});
 
 
 /*********************
@@ -65,6 +64,7 @@ let myBet = 2,
     myTeam = 'blue',
     opposingTeam = 'red',
     betComplete = false,
+    notifyTallySent = false,
     mostRecentChannel = preferences.channels[1],
     myStats = jsonfile.readFileSync(preferences.fileNames.statisticsDB)["myStats"],
     totals = {
@@ -84,19 +84,19 @@ let myBet = 2,
 
 const commands = {
     "!test": function() {
-        chat.say(mostRecentChannel, `MrDestructoid`, 0)
+        chat.say('MrDestructoid')
     },
     "!balance": function() {
-        chat.say(mostRecentChannel, `/me has ${myStats.currentBalance} mushrooms`, 0)
+        chat.say(`/me has ${myStats.currentBalance} mushrooms`)
     },
     farm: function() {
         timers.farm = process.hrtime();
-        chat.say(mostRecentChannel, '!farm')
+        chat.say('!farm')
     },
     bet: function(team, amount) {
         let _team = (team === 'blue') ? 'saltyt1Blue' : 'saltyt1Red';
         betComplete = true;
-        chat.say(mostRecentChannel, `${_team} ${amount}`)
+        chat.say(`${_team} ${amount}`)
     }
 };
 
@@ -104,6 +104,11 @@ const commands = {
 /*********************
  * General Functions *
  *********************/
+
+// Extends TwitchJS functionality.
+chat.say = limiter(msg => {
+    chat.send(`PRIVMSG #${mostRecentChannel} :${msg}`)
+}, 1500);
 
 // Returns the current time as a string, formatted with hours, minutes, seconds, and period. (ex: '[2:47:10 AM]')
 function getFormattedTime() {
@@ -157,7 +162,10 @@ function logCurrentTotals(team, mushrooms, user, message) {
             player.play(preferences.fileNames.largeBetSound, function(err) { if (err && !err.killed) throw err });
 
             // Inform chat that a large bet happened.
-            chat.say(preferences.channels[1],'/me ************ LARGE BET ************ ' + _extra.replace(' <--  ', ''))
+            chat.say('/me MrDestructoid LARGE BET MrDestructoid ' + _extra.replace(' <--  ', ''))
+        } else if (mushrooms === 2) {
+            // Inform chat that a tiny bet happened.
+            chat.say('/me MrDestructoid TINY BET! MrDestructoid ' + _extra.replace(' <--  ', ''))
         }
     }
 
@@ -182,10 +190,31 @@ function notifyBettingEnded() {
     betComplete = false;
     totals.red.bets = 0;
     totals.blue.bets = 0;
+    notifyTallySent = false;
     totals.red.mushrooms = 0;
     totals.blue.mushrooms = 0;
 
     console.log(colors.gray(`\n[${getFormattedTime()}] Betting has ended\n`))
+}
+
+function notifyOneHundredSecondTally() {
+    let _blueThousands = Math.floor(totals.blue.mushrooms / 1000);
+    let _redThousands = Math.floor(totals.red.mushrooms / 1000);
+    let _blueAmount = '';
+    let _redAmount = '';
+
+    if (_blueThousands >= 1000)
+        _blueAmount = `${(_blueThousands / 1000)} MILLION`;
+    else
+        _blueAmount = `${_blueThousands}k`;
+
+    if (_redThousands >= 1000)
+        _redAmount = `${(_redThousands / 1000)} MILLION`;
+    else
+        _redAmount = `${_redThousands}k`;
+
+    // Add extra text to show the large bet and the username.
+    chat.say(`/me MrDestructoid 100s UPDATE MrDestructoid Current tally: BLUE ${_blueAmount} | RED ${_redAmount}`)
 }
 
 // Decide how much to bet and which team to bet on.
@@ -226,6 +255,28 @@ function setBettingValues() {
         myBet = higher.mushrooms - lower.mushrooms;
 }
 
+// Create a queue of `fn` calls and execute them in order after `wait` milliseconds.
+function limiter(fn, wait) {
+    let isCalled = false,
+        calls = [];
+
+    let caller = function() {
+        if (calls.length && !isCalled) {
+            isCalled = true;
+            calls.shift().call();
+            setTimeout(function() {
+                isCalled = false;
+                caller()
+            }, wait)
+        }
+    };
+
+    return function() {
+        calls.push(fn.bind(this, ...arguments));
+        caller()
+    }
+}
+
 // Once per second, check on the sate of the timers.
 setInterval(() => {
     let _secondsSinceFarm = process.hrtime(timers.farm)[0];
@@ -234,6 +285,11 @@ setInterval(() => {
     // Farm mushrooms after x amount of seconds.
     if (_secondsSinceFarm >= preferences.delays.farm)
         commands.farm();
+
+    if (_secondsSinceFirstBet >= 100 && !notifyTallySent && isBettingOpen()) {
+        notifyOneHundredSecondTally();
+        notifyTallySent = true
+    }
 
     // Manually set betting to ended after x amount of seconds.
     if (_secondsSinceFirstBet >= 330 && isBettingOpen())
@@ -379,5 +435,5 @@ chat.connect()
         for (const channel of preferences.channels)
             chat.join(channel);
         console.clear();
-        console.log(colors.greenBright('Connection established\n'))
+        console.log(colors.greenBright('Connection established\n'));
     });
