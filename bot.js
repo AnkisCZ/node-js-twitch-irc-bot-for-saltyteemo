@@ -24,11 +24,11 @@ const preferences = {
         username: `${process.env.TWITCH_USERNAME}`
     },
     delays: {
-        betting: 185,
+        betting: 180,
         farm: 7200,
         botResponseDefault: 0
     },
-    betAmount: 2000 + Math.floor(Math.random() * 10),
+    betAmount: 3000 + Math.floor(Math.random() * 5),
     fileNames: {
         bettingStartedSound: 'media/teemo.mp3',
         largeBetSound: 'media/nani.mp3',
@@ -36,8 +36,8 @@ const preferences = {
         balanceHistoryDB: 'balanceHistory.json'
     },
     largeBetThresholds: {
-        regular: 25000,
-        massive: 175000
+        regular: 30000,
+        massive: 100000
     }
 };
 
@@ -47,14 +47,12 @@ const preferences = {
  ******************/
 
 // Create an instance of TwitchJS.
-console.clear();
-console.log(colors.yellowBright('\nConnecting...'));
 const { chat } = new TwitchJS({ 'username': preferences.credentials.username, 'token': preferences.credentials.token, log: { level: 0 } });
 
 // Extend TwitchJS functionality.
 chat.say = function (mostRecentChannel, message, botResponse = preferences.delays.botResponseDefault) {
     setTimeout(function () {
-        chat.send(`PRIVMSG #${mostRecentChannel} :${message}`);
+        chat.send(`PRIVMSG #${mostRecentChannel} :${message}`)
     }, botResponse)
 };
 
@@ -63,50 +61,42 @@ chat.say = function (mostRecentChannel, message, botResponse = preferences.delay
  * Global Properties *
  *********************/
 
-let totals = {
-    blue: {
-        mushrooms: 0,
-        bets: 0
+let myBet = 2,
+    myTeam = 'blue',
+    opposingTeam = 'red',
+    betComplete = false,
+    mostRecentChannel = preferences.channels[1],
+    myStats = jsonfile.readFileSync(preferences.fileNames.statisticsDB)["myStats"],
+    totals = {
+        blue: {
+            mushrooms: 0,
+            bets: 0
+        },
+        red: {
+            mushrooms: 0,
+            bets: 0
+        }
     },
-    red: {
-        mushrooms: 0,
-        bets: 0
-    }
-};
+    timers = {
+        firstBet: process.hrtime(),
+        farm: process.hrtime()
+    };
 
-let timers = {
-    firstBet: process.hrtime(),
-    farm: process.hrtime()
-};
-
-let myStats = jsonfile.readFileSync(preferences.fileNames.statisticsDB)["myStats"];
-
-let betComplete = false;
-
-let myTeam = '';
-
-let opposingTeam = '';
-
-let myBet;
-
-let mostRecentChannel = preferences.channels[1];
-
-let commands = {
+const commands = {
     "!test": function() {
-        chat.say(mostRecentChannel, `@${preferences.credentials.username} I hear you MrDestructoid`, 0)
+        chat.say(mostRecentChannel, `MrDestructoid`, 0)
     },
     "!balance": function() {
         chat.say(mostRecentChannel, `/me has ${myStats.currentBalance} mushrooms`, 0)
     },
     farm: function() {
-        chat.say(mostRecentChannel, '!farm');
-        timers.farm = process.hrtime()
+        timers.farm = process.hrtime();
+        chat.say(mostRecentChannel, '!farm')
     },
     bet: function(team, amount) {
-        team = (team === 'blue') ? 'saltyt1Blue' : 'saltyt1Red';
-
-        chat.say(mostRecentChannel, `${team} ${amount}`);
-        betComplete = true
+        let _team = (team === 'blue') ? 'saltyt1Blue' : 'saltyt1Red';
+        betComplete = true;
+        chat.say(mostRecentChannel, `${_team} ${amount}`)
     }
 };
 
@@ -125,8 +115,15 @@ function isBettingOpen() {
     return (totals.blue.mushrooms > 0 || totals.red.mushrooms > 0)
 }
 
-function setOpposingTeam(myTeam) {
-    return (myTeam === 'red') ? 'blue' : 'red';
+// Read statistics from JSON file.
+function fetchJSONData() {
+    let obj = jsonfile.readFileSync(preferences.fileNames.statisticsDB);
+    myStats = obj["myStats"]
+}
+
+// Write statistics to JSON file.
+function updateJSONData() {
+    jsonfile.writeFileSync(preferences.fileNames.statisticsDB, {"myStats": myStats})
 }
 
 // Logs the current time with the total mushrooms and bets for each team.
@@ -146,11 +143,10 @@ function logCurrentTotals(team, mushrooms, user, message) {
         let _thousands = Math.floor(mushrooms / 1000);
         let _largeAmount = '';
 
-        if (_thousands >= 1000) {
+        if (_thousands >= 1000)
             _largeAmount = `${(_thousands / 1000)} MILLION`;
-        } else {
+        else
             _largeAmount = `${_thousands}k`;
-        }
 
         // Add extra text to show the large bet and the username.
         _extra = ` <--  ${user} bet ${_largeAmount} on ${team} (balance: ${_balance} mushrooms)`;
@@ -159,16 +155,17 @@ function logCurrentTotals(team, mushrooms, user, message) {
         if (mushrooms >= preferences.largeBetThresholds.massive) {
             // Play audio file.
             player.play(preferences.fileNames.largeBetSound, function(err) { if (err && !err.killed) throw err });
-            chat.say(mostRecentChannel,'/me ************ LARGE BET ************ ' + _extra.replace(' <--  ', ''));
+
+            // Inform chat that a large bet happened.
+            chat.say(preferences.channels[1],'/me ************ LARGE BET ************ ' + _extra.replace(' <--  ', ''))
         }
     }
 
-    console.log(pad(_blue, 34) + ' | ' + pad(pad(34, _red), 33) + pad(16, seconds) + colors.bold(_extra));
+    console.log(pad(_blue, 34) + ' | ' + pad(pad(34, _red), 33) + pad(16, seconds) + colors.bold(_extra))
 }
 
 // Resets global betting properties and logs the time and other information.
 function notifyBettingEnded() {
-    console.log(colors.gray(`\n[${getFormattedTime()}] Betting has ended\n`));
     try {
         let profit = Math.floor(myBet / totals[myTeam].mushrooms * totals[opposingTeam].mushrooms);
         let gross = profit + myBet;
@@ -186,7 +183,9 @@ function notifyBettingEnded() {
     totals.red.bets = 0;
     totals.blue.bets = 0;
     totals.red.mushrooms = 0;
-    totals.blue.mushrooms = 0
+    totals.blue.mushrooms = 0;
+
+    console.log(colors.gray(`\n[${getFormattedTime()}] Betting has ended\n`))
 }
 
 // Decide how much to bet and which team to bet on.
@@ -201,10 +200,10 @@ function setBettingValues() {
     // Check which team is in the lead.
     if (red.mushrooms > blue.mushrooms) {
         higher = red;
-        lower = blue;
+        lower = blue
     } else {
         higher = blue;
-        lower = red;
+        lower = red
     }
 
     // Determine team to bet on.
@@ -217,26 +216,14 @@ function setBettingValues() {
     // If the odds are close, bet on blue.
     if (lower.mushrooms / higher.mushrooms > 0.80) {
         myTeam = blue;
-        opposingTeam = red;
+        opposingTeam = red
     }
 
     // If the odds are close, lower my bet amount accordingly.
-    if (myBet > lower.mushrooms) {
-        myBet = lower.mushrooms
-    } else if (myBet > higher.mushrooms - lower.mushrooms) {
+    if (myBet > lower.mushrooms)
+        myBet = lower.mushrooms;
+    else if (myBet > higher.mushrooms - lower.mushrooms)
         myBet = higher.mushrooms - lower.mushrooms;
-    }
-}
-
-// Read statistics from JSON file.
-function fetchJSONData() {
-    let obj = jsonfile.readFileSync(preferences.fileNames.statisticsDB);
-    myStats = obj["myStats"]
-}
-
-// Write statistics to JSON file.
-function updateJSONData() {
-    jsonfile.writeFileSync(preferences.fileNames.statisticsDB, {"myStats": myStats})
 }
 
 // Once per second, check on the sate of the timers.
@@ -257,7 +244,7 @@ setInterval(() => {
         setBettingValues();
         commands.bet(myTeam, myBet)
     }
-}, 1000)
+}, 1000);
 
 
 /******************************
@@ -290,22 +277,17 @@ function handleSaltbotMessage(channel, username, message) {
 
         // Check which user submitted the bet.
         let betting_user = '';
-        for (let word of message.split(" ")) {
+        for (let word of message.split(" "))
             if (word.toLowerCase().includes('@'))
-                betting_user = word.replace('@', '')
-        }
+                betting_user = word.replace('@', '');
 
         // Check if bet was sent by my account.
         if (message.toLowerCase().includes(preferences.credentials.username)) {
-            console.log(colors.grey(`\n[${getFormattedTime()}] Bet received\n`));
-
             // Update global properties.
             myTeam = team;
-            opposingTeam = setOpposingTeam(myTeam);
+            opposingTeam = (myTeam === 'red') ? 'blue' : 'red';
             myBet = mushrooms;
             betComplete = true;
-
-            // Update JSON files.
 
             // Record my latest balance.
             fetchJSONData();
@@ -322,8 +304,10 @@ function handleSaltbotMessage(channel, username, message) {
                 _winLossMsg = colors.redBright('LOSS');
                 myStats.losses += 1
             }
-            console.log(`${_baseMsg} ${_winLossMsg}`);
             updateJSONData();
+
+            console.log(colors.grey(`\n[${getFormattedTime()}] Bet received\n`));
+            console.log(`${_baseMsg} ${_winLossMsg}`)
         }
 
         logCurrentTotals(team, mushrooms, betting_user, message);
@@ -331,17 +315,17 @@ function handleSaltbotMessage(channel, username, message) {
 
     // Betting is over.
     if (message.includes('Betting has ended') && isBettingOpen())
-        notifyBettingEnded();
+        notifyBettingEnded()
 }
 
 // Handle any message sent by my own account.
 function handleMyMessage(channel, username, message) {
-    console.log(`[${getFormattedTime()}] <${colors.cyanBright(username)}> ${message}`);
-
     mostRecentChannel = channel;
 
     if (typeof commands[message] === 'function')
-        commands[message]()
+        commands[message]();
+
+    console.log(`[${getFormattedTime()}] <${colors.cyanBright(username)}> ${message}`)
 }
 
 // Handle any message sent from any user other than those that are already handled.
@@ -372,6 +356,7 @@ function handleOtherMessage(channel, username, message, isWhisper=false) {
 chat.on('PRIVMSG', (msg) => {
     let params = [msg.channel.replace("#", ""), msg.username, msg.message];
 
+    // Listen for specific users and bots.
     switch (msg.username) {
         case 'xxsaltbotxx':
             handleSaltbotMessage(...params); break;
@@ -384,14 +369,15 @@ chat.on('PRIVMSG', (msg) => {
 
 // Listen for all whispers.
 chat.on('WHISPER', (msg) => {
-    let params = [msg.channel.replace("#", ""), msg.username, msg.message, true];
-    handleOtherMessage(...params)
+    handleOtherMessage(msg.channel.replace("#", ""), msg.username, msg.message, true)
 });
 
 // Connect to IRC.
-chat.connect().then(() => {
-    // Join channels.
-    for (const channel of preferences.channels)
-        chat.join(channel);
-    console.log(colors.greenBright('Connection established\n'));
-});
+chat.connect()
+    .then(() => {
+        // Join channels.
+        for (const channel of preferences.channels)
+            chat.join(channel);
+        console.clear();
+        console.log(colors.greenBright('Connection established\n'))
+    });
