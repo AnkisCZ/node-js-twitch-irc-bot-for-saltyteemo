@@ -14,8 +14,8 @@ Install the project dependencies: `npm install`
     * "twitch-js": "^2.0.0-beta.30"
     * "play-sound": "^1.1.3"
 
-Open the `.env` file and add the following two lines,
-replacing the placeholders with your credentials:
+Create a file at the root of the project called `.env` and add the following two lines,
+replacing the placeholders with your personal credentials:
 ```
 TWITCH_USERNAME=yourusername
 TWITCH_PASSWORD=yourpassword
