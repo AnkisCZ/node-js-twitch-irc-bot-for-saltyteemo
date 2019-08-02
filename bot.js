@@ -24,19 +24,27 @@ const preferences = {
         username: `${process.env.TWITCH_USERNAME}`
     },
     delays: {
-        betting: 170,
-        collect: 3600,
-        botResponse: 1000
+        betting: 180,
+        farm: 10800,
+        botResponseDefault: 0,
+        tallyUpdate: 120
     },
-    betAmount: 3000 + Math.floor(Math.random() * 9),    // Random number between 1,000 and 1,009
-    alertSounds: {
-        bettingStarted: 'media/teemo.mp3',
-        largeBet: 'media/nani.mp3'
+    betAmount: 200 + Math.floor(Math.random() * 1),
+    betMultiplier: 0.02,
+    fileNames: {
+        bettingStartedSound: 'media/teemo.mp3',
+        largeBetSound: 'media/nani.mp3',
+        statisticsDB: 'data.json'
     },
     largeBetThresholds: {
-        regular: 25000,
-        massive: 150000
+        regular: 30000,
+        massive: 75000
     }
+};
+
+let botState = {
+	isPaused: false,
+	isMuted: false
 };
 
 
@@ -61,10 +69,31 @@ chat.say = function (mostRecentChannel, message) {
  * Global Properties *
  *********************/
 
-let totals = {
-    'blue': {
-        'mushrooms': 0,
-        'bets': 0
+let myBet = 101,
+    myTeam = 'blue',
+    opposingTeam = 'red',
+    betComplete = false,
+    notifyTallySent = false,
+    mostRecentChannel = preferences.channels[1],
+    myStats = jsonfile.readFileSync(preferences.fileNames.statisticsDB)["myStats"],
+    totals = {
+        blue: {
+            mushrooms: 0,
+            bets: 0
+        },
+        red: {
+            mushrooms: 0,
+            bets: 0
+        }
+    },
+    timers = {
+        firstBet: process.hrtime(),
+        farm: process.hrtime()
+    };
+
+const commands = {
+    "!test": function() {
+        // chat.say('MrDestructoid')
     },
     'red': {
         'mushrooms': 0,
@@ -91,6 +120,50 @@ let commands = {
     '!test': function() {
         chat.say(mostRecentChannel, `@${preferences.credentials.username} I hear you MrDestructoid`)
     },
+    "!chub": function(arg) {
+		let response = "hello";
+
+		switch(arg) {
+			case "pause":
+				if (botState.isPaused === true) {
+					response = "I'm already paused";
+				} else {
+					response = "betting paused";
+					botState.isPaused = true
+				}
+				break;
+			case "unpause":
+				if (botState.isPaused === false) {
+					response = "I'm already unpaused";
+				} else {
+					response = "betting unpaused";
+					botState.isPaused = false
+				}
+				break;
+			case "mute":
+				if (botState.isMuted === true) {
+					response = "I'm already muted";
+				} else {
+					response = "alerts muted";
+					botState.isMuted = true
+				}
+				break;
+			case "unmute":
+				if (botState.isMuted === false) {
+					response = "I'm already muted";
+				} else {
+					response = "alerts unmuted";
+					botState.isMuted = false
+				}
+				break;
+		}
+
+		chat.send(`PRIVMSG #${mostRecentChannel} :/me @${preferences.credentials.username} ${response}`)
+    },
+    farm: function() {
+        timers.farm = process.hrtime();
+        chat.say('!farm')
+    },
     collect: function() {
         chat.say(mostRecentChannel, '!farm');
         timers['!collect'] = process.hrtime()
@@ -106,6 +179,20 @@ let commands = {
  * General Functions *
  *********************/
 
+// Extends TwitchJS functionality.
+chat.say = limiter(msg => {
+	if (!botState.isMuted) {
+	    chat.send(`PRIVMSG #${mostRecentChannel} :${msg}`)
+	}
+}, 1500);
+
+// Calculates the average of an array of numbers.
+const avg = (arr) => _.chain(arr)
+    .sum()
+    .divide(arr.length)
+    .round(1)
+    .value();
+
 // Returns the current time as a string, formatted with hours, minutes, seconds, and period. (ex: '[2:47:10 AM]')
 function getFormattedTime() {
     return new Date().toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true })
@@ -114,6 +201,20 @@ function getFormattedTime() {
 // Returns the current state of betting as a boolean.
 function isBettingOpen() {
     return (totals.blue.mushrooms > 0 || totals.red.mushrooms > 0)
+}
+
+// Read statistics from JSON file.
+function fetchJSONData() {
+    let obj = jsonfile.readFileSync(preferences.fileNames.statisticsDB);
+    myStats = obj["myStats"]
+    preferences.betAmount = Math.floor(myStats.currentBalance * preferences.betMultiplier);
+    if (preferences.betAmount < 100)
+        preferences.betAmount = 100;
+}
+
+// Write statistics to JSON file.
+function updateJSONData() {
+    jsonfile.writeFileSync(preferences.fileNames.statisticsDB, {"myStats": myStats})
 }
 
 // Logs the current time with the total mushrooms and bets for each team.
@@ -136,7 +237,11 @@ function logCurrentTotals(team, mushrooms, user) {
         // A very large bet was detected
         if (mushrooms >= preferences.largeBetThresholds.massive) {
             // Play audio file.
-            player.play(preferences.alertSounds.largeBet, function(err) { if (err && !err.killed) throw err })
+            if (!botState.isMuted)
+                player.play(preferences.fileNames.largeBetSound, function(err) { if (err && !err.killed) throw err });
+
+            // Inform chat that a large bet happened.
+            //chat.say('/me PogChamp PogChamp LARGE BET PogChamp PogChamp ' + _extra.replace(' <--  ', '').replace('blue', 'saltyt1Blue').replace('red', 'saltyt1Red'))
         }
     }
 
@@ -163,7 +268,46 @@ function notifyBettingEnded() {
     totals.red.bets = 0;
     totals.blue.bets = 0;
     totals.red.mushrooms = 0;
-    totals.blue.mushrooms = 0
+    totals.blue.mushrooms = 0;
+
+    console.log(colors.gray(`[${getFormattedTime()}] Betting has ended\n`))
+
+    // Record how long betting was open to find an average.
+    try {
+        let obj = jsonfile.readFileSync('history.json');
+        let history = obj["history"];
+        history.push(process.hrtime(timers.firstBet)[0]);
+        jsonfile.writeFileSync('history.json', {"history": history})
+
+        console.log(Math.floor(avg(history)));
+    } catch (e) { console.log('history.json failed...', e) }
+}
+
+function notifyOneHundredSecondTally() {
+    let _blueThousands = Math.floor(totals.blue.mushrooms / 1000);
+    let _redThousands = Math.floor(totals.red.mushrooms / 1000);
+    let _blueAmount = '';
+    let _redAmount = '';
+
+    if (_blueThousands >= 1000)
+        _blueAmount = `${(_blueThousands / 1000)} MILLION`;
+    else
+        _blueAmount = `${_blueThousands}k`;
+
+    if (_redThousands >= 1000)
+        _redAmount = `${(_redThousands / 1000)} MILLION`;
+    else
+        _redAmount = `${_redThousands}k`;
+
+    // Set a mathematical symbol representing which team is in the lead.
+    let _comparisonSymbol = '=';
+    if (_blueThousands > _redThousands)
+        _comparisonSymbol = '>';
+    else if (_blueThousands < _redThousands)
+        _comparisonSymbol = '<';
+
+    // Add extra text to show the large bet and the username.
+    chat.say(`/me GivePLZ 2 MIN UPDATE TakeNRG saltyt1Blue ${_blueAmount} ${_comparisonSymbol} ${_redAmount} saltyt1Red`)
 }
 
 // Decide how much to bet and which team to bet on.
@@ -220,6 +364,33 @@ function initTimers() {
     }, 1000)
 }
 
+// Once per second, check on the sate of the timers.
+setInterval(() => {
+    let _secondsSinceFarm = process.hrtime(timers.farm)[0];
+    let _secondsSinceFirstBet = process.hrtime(timers.firstBet)[0];
+
+    // Farm mushrooms after x amount of seconds.
+    if (_secondsSinceFarm >= preferences.delays.farm)
+        commands.farm();
+
+    /*
+    if (_secondsSinceFirstBet >= preferences.delays.tallyUpdate && !notifyTallySent && isBettingOpen()) {
+        notifyOneHundredSecondTally();
+        notifyTallySent = true
+    }
+    */
+
+    // Manually set betting to ended after x amount of seconds.
+    if (_secondsSinceFirstBet >= 330 && isBettingOpen())
+        notifyBettingEnded();
+
+    // Bet on a team after x amount of seconds.
+    if (_secondsSinceFirstBet >= preferences.delays.betting && !betComplete && isBettingOpen()) {
+        setBettingValues();
+        commands.bet(myTeam, myBet)
+    }
+}, 1000);
+
 
 /******************************
  * Message Handling Functions *
@@ -234,7 +405,8 @@ function handleSaltbotMessage(channel, username, message) {
             timers.firstBet = process.hrtime();
 
             // Play audio file.
-            player.play(preferences.alertSounds.bettingStarted, function(err) { if (err && !err.killed) throw err });
+            if (!botState.isMuted)
+                player.play(preferences.fileNames.bettingStartedSound, function(err) { if (err && !err.killed) throw err });
 
             console.log(colors.greenBright(`\n[${getFormattedTime()}] Betting has started\n`))
         }
@@ -278,8 +450,14 @@ function handleMyMessage(channel, username, message) {
 
     mostRecentChannel = channel;
 
-    if (typeof commands[message] === 'function')
-        commands[message]()
+    const messageSplit = message.split(" ");
+	const cmd = messageSplit[0];
+	const arg = messageSplit[1];
+
+    if (typeof commands[cmd] === 'function')
+        commands[cmd](arg);
+
+    console.log(`[${getFormattedTime()}] <${colors.cyanBright(username)}> ${message}`)
 }
 
 // Handle any message sent from any user other than those that are already handled.
