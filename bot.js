@@ -105,7 +105,7 @@ const commands = {
 
 // Extends TwitchJS functionality.
 chat.say = limiter(msg => {
-	if (!botState.isPaused)i {
+	if (!botState.isPaused) {
 	    chat.send(`PRIVMSG #${mostRecentChannel} :${msg}`)
 	}
 }, 1500);
