@@ -1,3 +1,11 @@
+/**
+ *  This version of bot.js handles:
+ *      - submitting bets
+ *      - farming mushrooms
+ *      - sounding alerts
+ *      - responding to chuby1tubby in chat
+ */
+
 /*******************
  * Library Imports *
  *******************/
@@ -21,14 +29,13 @@ let preferences = {
         'chatrooms:50815446:9df7f32a-d7f5-4011-ba56-a81b04851102'
     ],
     credentials: {
-        token: `${process.env.TWITCH_TOKEN}`,
+        token: `${process.env.TWITCH_PASSWORD}`,
         username: `${process.env.TWITCH_USERNAME}`
     },
     delays: {
         betting: 170,
         farm: 7200,
-        botResponseDefault: 0,
-        tallyUpdate: 120
+        botResponseDefault: 0
     },
     betAmount: 200 + Math.floor(Math.random() * 1),
     fileNames: {
@@ -64,7 +71,6 @@ let myBet = 101,
     myTeam = 'blue',
     opposingTeam = 'red',
     betComplete = false,
-    notifyTallySent = false,
     mostRecentChannel = preferences.channels[1],
     myStats = jsonfile.readFileSync(preferences.fileNames.statisticsDB)["myStats"],
     totals = {
@@ -110,13 +116,6 @@ chat.say = limiter(msg => {
     chat.send(`PRIVMSG #${mostRecentChannel} :${msg}`)
 }, 1500);
 
-// Calculates the average of an array of numbers.
-const avg = (arr) => _.chain(arr)
-    .sum()
-    .divide(arr.length)
-    .round(1)
-    .value()
-
 // Returns the current time as a string, formatted with hours, minutes, seconds, and period. (ex: '[2:47:10 AM]')
 function getFormattedTime() {
     return new Date().toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true })
@@ -131,9 +130,9 @@ function isBettingOpen() {
 function fetchJSONData() {
     let obj = jsonfile.readFileSync(preferences.fileNames.statisticsDB);
     myStats = obj["myStats"]
-    preferences.betAmount = Math.floor(myStats.currentBalance * 0.03);
-    if (preferences.betAmount < 10)
-        preferences.betAmount = 10;
+    preferences.betAmount = Math.floor(myStats.currentBalance * 0.02);
+    if (preferences.betAmount < 100)
+        preferences.betAmount = 1000;
 }
 
 // Write statistics to JSON file.
@@ -171,9 +170,6 @@ function logCurrentTotals(team, mushrooms, user, message) {
             // Play audio file.
             if (!preferences.mute)
                 player.play(preferences.fileNames.largeBetSound, function(err) { if (err && !err.killed) throw err });
-
-            // Inform chat that a large bet happened.
-            chat.say('/me PogChamp PogChamp LARGE BET PogChamp PogChamp ' + _extra.replace(' <--  ', '').replace('blue', 'saltyt1Blue').replace('red', 'saltyt1Red'))
         }
     }
 
@@ -182,15 +178,10 @@ function logCurrentTotals(team, mushrooms, user, message) {
 
 // Resets global betting properties and logs the time and other information.
 function notifyBettingEnded() {
-    try {
-        let profit = Math.floor(myBet / totals[myTeam].mushrooms * totals[opposingTeam].mushrooms);
-        let gross = profit + myBet;
-        profit = profit.toLocaleString();
-        gross = gross.toLocaleString();
-
-        console.log(`Your bet: !${myTeam} ${myBet}`);
-        console.log(`Winnings: +${gross} mushrooms (${profit} profit)\n`);
-    } catch (err) {}
+    let profit = Math.floor(myBet / totals[myTeam].mushrooms * totals[opposingTeam].mushrooms);
+    let gross = profit + myBet;
+    profit = profit.toLocaleString();
+    gross = gross.toLocaleString();
 
     myBet = 0;
     myTeam = '';
@@ -204,43 +195,9 @@ function notifyBettingEnded() {
 
     console.log(colors.gray(`\n[${getFormattedTime()}] Betting has ended\n`))
 
-    // TEMP CODE:
-    // Record how long betting was open to find an average.
-    try {
-        let obj = jsonfile.readFileSync('history.json');
-        let history = obj["history"];
-        history.push(process.hrtime(timers.firstBet)[0]);
-        jsonfile.writeFileSync('history.json', {"history": history})
-
-        console.log(Math.floor(avg(history)));
-    } catch (e) { console.log('history.json failed...', e) }
-}
-
-function notifyOneHundredSecondTally() {
-    let _blueThousands = Math.floor(totals.blue.mushrooms / 1000);
-    let _redThousands = Math.floor(totals.red.mushrooms / 1000);
-    let _blueAmount = '';
-    let _redAmount = '';
-
-    if (_blueThousands >= 1000)
-        _blueAmount = `${(_blueThousands / 1000)} MILLION`;
-    else
-        _blueAmount = `${_blueThousands}k`;
-
-    if (_redThousands >= 1000)
-        _redAmount = `${(_redThousands / 1000)} MILLION`;
-    else
-        _redAmount = `${_redThousands}k`;
-
-    // Set a mathematical symbol representing which team is in the lead.
-    let _comparisonSymbol = '=';
-    if (_blueThousands > _redThousands)
-        _comparisonSymbol = '>';
-    else if (_blueThousands < _redThousands)
-        _comparisonSymbol = '<';
-
-    // Add extra text to show the large bet and the username.
-    chat.say(`/me GivePLZ 2 MIN UPDATE TakeNRG saltyt1Blue ${_blueAmount} ${_comparisonSymbol} ${_redAmount} saltyt1Red`)
+    // Log personal stats after betting ends.
+    console.log(`Your bet: !${myTeam} ${myBet}`);
+    console.log(`Winnings: +${gross} mushrooms (${profit} profit)\n`);
 }
 
 // Decide how much to bet and which team to bet on.
@@ -312,11 +269,6 @@ setInterval(() => {
     if (_secondsSinceFarm >= preferences.delays.farm)
         commands.farm();
 
-    if (_secondsSinceFirstBet >= preferences.delays.tallyUpdate && !notifyTallySent && isBettingOpen()) {
-        notifyOneHundredSecondTally();
-        notifyTallySent = true
-    }
-
     // Manually set betting to ended after x amount of seconds.
     if (_secondsSinceFirstBet >= 330 && isBettingOpen())
         notifyBettingEnded();
@@ -376,24 +328,12 @@ function handleSaltbotMessage(channel, username, message) {
             fetchJSONData();
             myStats.previousBalance = myStats.currentBalance;
             myStats.currentBalance = balance;
-
-            // Record whether the previous game was a win or loss.
-            let _baseMsg = colors.grey('Previous game was a');
-            let _winLossMsg = '';
-            if (myStats.currentBalance - myStats.previousBalance > 1) {
-                _winLossMsg = colors.greenBright('WIN');
-                myStats.wins += 1
-            } else {
-                _winLossMsg = colors.redBright('LOSS');
-                myStats.losses += 1
-            }
             updateJSONData();
 
-            console.log(colors.grey(`\n[${getFormattedTime()}] Bet received\n`));
-            console.log(`${_baseMsg} ${_winLossMsg}`)
+            console.log(colors.grey(`\n[${getFormattedTime()}] Bet received\n`))
         }
 
-        logCurrentTotals(team, mushrooms, betting_user, message);
+        logCurrentTotals(team, mushrooms, betting_user, message)
     }
 
     // Betting is over.
@@ -403,8 +343,6 @@ function handleSaltbotMessage(channel, username, message) {
 
 // Handle any message sent by my own account.
 function handleMyMessage(channel, username, message) {
-    mostRecentChannel = channel;
-
     if (typeof commands[message] === 'function')
         commands[message]();
 
@@ -461,8 +399,7 @@ chat.connect()
         // Join channels.
         for (const channel of preferences.channels)
             chat.join(channel);
-        console.clear();
-        console.log(colors.greenBright('Connection established\n'));
 
-        fetchJSONData()
+        console.clear();
+        console.log(colors.greenBright('Connection established\n'))
     });
