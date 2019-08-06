@@ -38,7 +38,7 @@ let preferences = {
         botResponseDefault: 0
     },
     betAmount: 200,
-    betMultiplyer: 0.015,
+    betMultiplier: 0.015,
     fileNames: {
         bettingStartedSound: 'media/teemo.mp3',
         largeBetSound: 'media/nani.mp3',
@@ -131,7 +131,7 @@ function isBettingOpen() {
 function fetchJSONData() {
     let obj = jsonfile.readFileSync(preferences.fileNames.statisticsDB);
     myStats = obj["myStats"]
-    preferences.betAmount = Math.floor(myStats.currentBalance * preferences.betMultiplyer);
+    preferences.betAmount = Math.floor(myStats.currentBalance * preferences.betMultiplier);
     if (preferences.betAmount < 100)
         preferences.betAmount = 1000;
 }
