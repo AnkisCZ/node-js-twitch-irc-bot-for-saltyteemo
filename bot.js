@@ -33,11 +33,12 @@ let preferences = {
         username: `${process.env.TWITCH_USERNAME}`
     },
     delays: {
-        betting: 170,
+        betting: 190,
         farm: 7200,
         botResponseDefault: 0
     },
-    betAmount: 200 + Math.floor(Math.random() * 1),
+    betAmount: 200,
+    betMultiplyer: 0.015,
     fileNames: {
         bettingStartedSound: 'media/teemo.mp3',
         largeBetSound: 'media/nani.mp3',
@@ -130,7 +131,7 @@ function isBettingOpen() {
 function fetchJSONData() {
     let obj = jsonfile.readFileSync(preferences.fileNames.statisticsDB);
     myStats = obj["myStats"]
-    preferences.betAmount = Math.floor(myStats.currentBalance * 0.02);
+    preferences.betAmount = Math.floor(myStats.currentBalance * preferences.betMultiplyer);
     if (preferences.betAmount < 100)
         preferences.betAmount = 1000;
 }
@@ -223,6 +224,7 @@ function setBettingValues() {
     opposingTeam = higher.name;
 
     // Determine amount to bet.
+    fetchJSONData();
     myBet = preferences.betAmount;
 
     // If the odds are close, bet on blue.
@@ -322,6 +324,7 @@ function handleSaltbotMessage(channel, username, message) {
             myTeam = team.toLowerCase();
             opposingTeam = (myTeam === 'red') ? 'blue' : 'red';
             myBet = mushrooms;
+            preferences.betAmount = myBet;
             betComplete = true;
 
             // Record my latest balance.
@@ -399,6 +402,8 @@ chat.connect()
         // Join channels.
         for (const channel of preferences.channels)
             chat.join(channel);
+
+        fetchJSONData();
 
         console.clear();
         console.log(colors.greenBright('Connection established\n'))
