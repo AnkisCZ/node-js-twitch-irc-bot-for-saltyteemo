@@ -94,7 +94,7 @@ const commands = {
 				break;
 		}
 
-		chat.send(`PRIVMSG #${mostRecentChannel} :/me @${preferences.credentials.username} ${response}`)
+		chat.send(`PRIVMSG #${mostRecentChannel} :/me @chuby1tubby ${response}`)
     }
 };
 
@@ -190,9 +190,8 @@ function notifyOneHundredSecondTally() {
         _comparisonSymbol = '<';
 
     // Add extra text to show the large bet and the username.
-    chat.say(`/me GivePLZ GivePLZ 2 MINUTE UPDATE TakeNRG TakeNRG saltyt1Blue ${_blueAmount} ${_comparisonSymbol} ${_redAmount} saltyt1Red`)
-
-    console.log(`2 MINUTE UPDATE saltyt1Blue ${_blueAmount} ${_comparisonSymbol} ${_redAmount} saltyt1Red`);
+    chat.say(`/me GivePLZ GivePLZ 2 MIN UPDATE TakeNRG TakeNRG Blue ${_blueAmount} ${_comparisonSymbol} ${_redAmount} Red`)
+    console.log(`2 MINUTE UPDATE Blue ${_blueAmount} ${_comparisonSymbol} ${_redAmount} Red`);
 }
 
 // Create a queue of `fn` calls and execute them in order after `wait` milliseconds.
@@ -223,6 +222,7 @@ setInterval(() => {
 
     // Notify blue vs. red tally.
     if (_secondsSinceFirstBet >= preferences.delays.tallyUpdate && !notifyTallySent && isBettingOpen()) {
+        console.log('120 seconds elapsed...');
         notifyOneHundredSecondTally();
         notifyTallySent = true
     }
@@ -312,6 +312,10 @@ function handleMyMessage(channel, username, message) {
         commands[cmd](arg);
 
     console.log(`[${getFormattedTime()}] <${colors.cyanBright(username)}> ${message}`)
+
+    if (message.toLowerCase() === `@${preferences.credentials.username}`) {
+        chat.say(`VoHiYo`);
+    }
 }
 
 // Handle any message sent from any user other than those that are already handled.
@@ -331,6 +335,10 @@ function handleOtherMessage(channel, username, message, isWhisper=false) {
 
         console.log(colors.bgRed(`[${getFormattedTime()}] <${(username)}> ${_message}`))
     }
+
+    if (message.toLowerCase() === `@${preferences.credentials.username}`) {
+        chat.say(`DansGame`);
+    }
 }
 
 
@@ -346,7 +354,6 @@ chat.on('PRIVMSG', (msg) => {
     switch (msg.username) {
         case 'xxsaltbotxx':
             handleSaltbotMessage(...params); break;
-        //case preferences.credentials.username:
         case 'chuby1tubby':
             handleMyMessage(...params); break;
         default:
