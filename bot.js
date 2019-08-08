@@ -42,7 +42,8 @@ let preferences = {
     fileNames: {
         bettingStartedSound: 'media/teemo.mp3',
         largeBetSound: 'media/nani.mp3',
-        statisticsDB: 'data.json'
+        statisticsDB: 'data.json',
+        cardsAPI: 'cards.json'
     },
     largeBetThresholds: {
         regular: 30000,
@@ -74,6 +75,7 @@ let myBet = 101,
     betComplete = false,
     mostRecentChannel = preferences.channels[1],
     myStats = jsonfile.readFileSync(preferences.fileNames.statisticsDB)["myStats"],
+    cardsAPI = jsonfile.readFileSync(preferences.fileNames.cardsAPI),
     totals = {
         blue: {
             mushrooms: 0,
@@ -95,6 +97,30 @@ const commands = {
     },
     "!balance": function() {
         chat.say(`/me has ${myStats.currentBalance} mushrooms`)
+    },
+    "!card": function() {
+        const blackCard = _.sample(cardsAPI['blackCards']);
+
+        let blackText = blackCard['text'],
+            blanks = blackCard['pick'];
+
+        if (blanks <= 1 && !blackText.includes("_")) {
+            let whiteText = _.sample(cardsAPI['whiteCards']);
+
+            chat.say(blackText);
+            chat.say(whiteText);
+        } else {
+            let message = blackText;
+
+            for (let i = 1; i <= blanks; i++) {
+                let whiteText = _.sample(cardsAPI['whiteCards']).replace('.', '');
+                whiteText = whiteText.charAt(0).toLowerCase() + whiteText.slice(1);
+                message = message.replace('_', whiteText);
+            }
+            chat.say(message)
+        }
+
+        console.log(blackCard)
     },
     farm: function() {
         timers.farm = process.hrtime();
@@ -130,7 +156,7 @@ function isBettingOpen() {
 // Read statistics from JSON file.
 function fetchJSONData() {
     let obj = jsonfile.readFileSync(preferences.fileNames.statisticsDB);
-    myStats = obj["myStats"]
+    myStats = obj["myStats"];
     preferences.betAmount = Math.floor(myStats.currentBalance * preferences.betMultiplier);
     if (preferences.betAmount < 100)
         preferences.betAmount = 1000;
@@ -190,7 +216,6 @@ function notifyBettingEnded() {
     betComplete = false;
     totals.red.bets = 0;
     totals.blue.bets = 0;
-    notifyTallySent = false;
     totals.red.mushrooms = 0;
     totals.blue.mushrooms = 0;
 
@@ -369,6 +394,10 @@ function handleOtherMessage(channel, username, message, isWhisper=false) {
 
         console.log(colors.bgRed(`[${getFormattedTime()}] <${(username)}> ${_message}`))
     }
+
+    // Message is the cards against humanity command.
+    if (message === "!card" && channel === preferences.channels[1])
+        commands["!card"]()
 }
 
 
