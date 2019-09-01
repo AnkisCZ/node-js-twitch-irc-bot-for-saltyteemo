@@ -33,7 +33,7 @@ let preferences = {
         username: `${process.env.TWITCH_USERNAME}`
     },
     delays: {
-        betting: 190,
+        betting: 178,
         farm: 7200,
         botResponseDefault: 0
     },
@@ -122,6 +122,22 @@ const commands = {
 
         console.log(blackCard)
     },
+    "!blue": function() {
+        setBettingValues();
+        commands.bet('blue', myBet)
+    },
+    "saltyt1Blue": function() {
+        setBettingValues();
+        commands.bet('blue', myBet)
+    },
+    "!red": function() {
+        setBettingValues();
+        commands.bet('red', myBet)
+    },
+    "saltyt1Red": function() {
+        setBettingValues();
+        commands.bet('red', myBet)
+    },
     farm: function() {
         timers.farm = process.hrtime();
         chat.say('!farm')
@@ -135,7 +151,6 @@ const commands = {
 
 
 /*********************
- * General Functions *
  *********************/
 
 // Extends TwitchJS functionality.
