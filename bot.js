@@ -23,7 +23,8 @@ let preferences = {
     },
     delays: {
         botResponseDefault: 0,
-        tallyUpdate: 120
+        tallyUpdate: 150,
+        farm: 14400
     },
     largeBetThresholds: {
         regular: 25000,
@@ -32,7 +33,7 @@ let preferences = {
 };
 
 let botState = {
-	isPaused: false
+    isPaused: false
 };
 
 
@@ -65,7 +66,8 @@ let notifyTallySent = false,
         }
     },
     timers = {
-        firstBet: process.hrtime()
+        firstBet: process.hrtime(),
+        farm: process.hrtime()
     };
 
 const commands = {
@@ -73,28 +75,33 @@ const commands = {
         chat.say('MrDestructoid')
     },
     "!wub": function(arg) {
-		let response = "hello";
+        let response = "hello";
 
-		switch(arg) {
-			case "pause":
-				if (botState.isPaused === true) {
-					response = "I'm already paused";
-				} else {
-					response = "betting paused";
-					botState.isPaused = true
-				}
-				break;
-			case "unpause":
-				if (botState.isPaused === false) {
-					response = "I'm already unpaused";
-				} else {
-					response = "betting unpaused";
-					botState.isPaused = false
-				}
-				break;
-		}
+        switch(arg) {
+            case "pause":
+                if (botState.isPaused === true) {
+                    response = "I'm already paused";
+                } else {
+                    response = "betting paused";
+                    botState.isPaused = true
+                }
+                break;
+            case "unpause":
+                if (botState.isPaused === false) {
+                    response = "I'm already unpaused";
+                } else {
+                    response = "betting unpaused";
+                    botState.isPaused = false
+                }
+                break;
+        }
 
-		chat.send(`PRIVMSG #${mostRecentChannel} :/me @chuby1tubby ${response}`)
+        chat.send(`PRIVMSG #${mostRecentChannel} :/me @chuby1tubby ${response}`)
+    },
+    farm: function() {
+        timers.farm = process.hrtime();
+        chat.send(`PRIVMSG #saltyteemo :!farm`);
+        mostRecentChannel = preferences.channels[1]
     }
 };
 
@@ -105,9 +112,9 @@ const commands = {
 
 // Extends TwitchJS functionality.
 chat.say = limiter(msg => {
-	if (!botState.isPaused) {
-	    chat.send(`PRIVMSG #${mostRecentChannel} :${msg}`)
-	}
+    if (!botState.isPaused) {
+        chat.send(`PRIVMSG #${mostRecentChannel} :${msg}`)
+    }
 }, 1500);
 
 // Returns the current time as a string, formatted with hours, minutes, seconds, and period. (ex: '[2:47:10 AM]')
@@ -190,7 +197,7 @@ function notifyOneHundredSecondTally() {
         _comparisonSymbol = '<';
 
     // Add extra text to show the large bet and the username.
-    chat.say(`/me GivePLZ GivePLZ 2 MIN UPDATE TakeNRG TakeNRG Blue ${_blueAmount} ${_comparisonSymbol} ${_redAmount} Red`)
+    chat.say(`/me GivePLZ GivePLZ 2.5 MIN UPDATE TakeNRG TakeNRG Blue ${_blueAmount} ${_comparisonSymbol} ${_redAmount} Red`)
     console.log(`2 MINUTE UPDATE Blue ${_blueAmount} ${_comparisonSymbol} ${_redAmount} Red`);
 }
 
@@ -218,11 +225,15 @@ function limiter(fn, wait) {
 
 // Once per second, check on the sate of the timers.
 setInterval(() => {
+    let _secondsSinceFarm = process.hrtime(timers.farm)[0];
     let _secondsSinceFirstBet = process.hrtime(timers.firstBet)[0];
+
+    // Farm mushrooms after x amount of seconds.
+    if (_secondsSinceFarm >= preferences.delays.farm)
+        commands.farm();
 
     // Notify blue vs. red tally.
     if (_secondsSinceFirstBet >= preferences.delays.tallyUpdate && !notifyTallySent && isBettingOpen()) {
-        console.log('120 seconds elapsed...');
         notifyOneHundredSecondTally();
         notifyTallySent = true
     }
@@ -305,8 +316,8 @@ function handleMyMessage(channel, username, message) {
     mostRecentChannel = preferences.channels[1];
 
     const messageSplit = message.split(" ");
-	const cmd = messageSplit[0];
-	const arg = messageSplit[1];
+    const cmd = messageSplit[0];
+    const arg = messageSplit[1];
 
     if (typeof commands[cmd] === 'function')
         commands[cmd](arg);
