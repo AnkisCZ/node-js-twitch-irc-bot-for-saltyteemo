@@ -1,4 +1,6 @@
 /**
+ *  Chub Bot
+ *
  *  This version of bot.js handles:
  *      - submitting bets
  *      - farming mushrooms
@@ -26,7 +28,9 @@ const player = require('play-sound')(opts = {});
 let preferences = {
     channels: [
         'saltyteemo',
-        'chatrooms:50815446:9df7f32a-d7f5-4011-ba56-a81b04851102'
+        // #rules discontinued on 2019-10-13.
+        //'chatrooms:50815446:9df7f32a-d7f5-4011-ba56-a81b04851102'
+        'chuby1tubby'
     ],
     credentials: {
         token: `${process.env.TWITCH_PASSWORD}`,
@@ -38,7 +42,7 @@ let preferences = {
         botResponseDefault: 0
     },
     betAmount: 200,
-    betMultiplier: 0.015,
+    betMultiplier: 0.0075,
     fileNames: {
         bettingStartedSound: 'media/teemo.mp3',
         largeBetSound: 'media/nani.mp3',
@@ -93,10 +97,7 @@ let myBet = 101,
 
 const commands = {
     "!test": function() {
-        chat.say('MrDestructoid')
-    },
-    "!balance": function() {
-        chat.say(`/me has ${myStats.currentBalance} mushrooms`)
+        chat.say('MrDestructoid', mostRecentChannel)
     },
     "!card": function() {
         const blackCard = _.sample(cardsAPI['blackCards']);
@@ -107,8 +108,8 @@ const commands = {
         if (blanks <= 1 && !blackText.includes("_")) {
             let whiteText = _.sample(cardsAPI['whiteCards']);
 
-            chat.say(blackText);
-            chat.say(whiteText);
+            chat.say(blackText, preferences.channels[1]);
+            chat.say(whiteText, preferences.channels[1]);
         } else {
             let message = blackText;
 
@@ -117,10 +118,8 @@ const commands = {
                 whiteText = whiteText.charAt(0).toLowerCase() + whiteText.slice(1);
                 message = message.replace('_', whiteText);
             }
-            chat.say(message)
+            chat.say(message, preferences.channels[1])
         }
-
-        console.log(blackCard)
     },
     "!blue": function() {
         setBettingValues();
@@ -140,12 +139,12 @@ const commands = {
     },
     farm: function() {
         timers.farm = process.hrtime();
-        chat.say('!farm')
+        chat.say('!farm', preferences.channels[0])
     },
     bet: function(team, amount) {
         let _team = (team === 'blue') ? 'saltyt1Blue' : 'saltyt1Red';
         betComplete = true;
-        chat.say(`${_team} ${amount}`)
+        chat.say(`${_team} ${amount}`, preferences.channels[0])
     }
 };
 
@@ -154,8 +153,8 @@ const commands = {
  *********************/
 
 // Extends TwitchJS functionality.
-chat.say = limiter(msg => {
-    chat.send(`PRIVMSG #${mostRecentChannel} :${msg}`)
+chat.say = limiter((msg, channel) => {
+    chat.send(`PRIVMSG #${channel} :${msg}`)
 }, 1500);
 
 // Returns the current time as a string, formatted with hours, minutes, seconds, and period. (ex: '[2:47:10 AM]')
@@ -274,10 +273,14 @@ function setBettingValues() {
     }
 
     // If the odds are close, lower my bet amount accordingly.
-    if (myBet > lower.mushrooms)
-        myBet = lower.mushrooms;
-    else if (myBet > higher.mushrooms - lower.mushrooms)
-        myBet = higher.mushrooms - lower.mushrooms;
+    if (myBet > lower.mushrooms || myBet > higher.mushrooms - lower.mushrooms)
+        myBet = Math.ceil(myBet / 2);
+
+    // Finally, if the bet would bring my balance below 'x' shrooms, reduce the bet amount.
+    const minBalance = 1000000;
+    const maxBet = myStats.currentBalance - minBalance;
+    if (myBet > maxBet)
+        myBet = maxBet;
 }
 
 // Create a queue of `fn` calls and execute them in order after `wait` milliseconds.
