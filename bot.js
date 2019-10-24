@@ -15,7 +15,9 @@ const TwitchJS = require('twitch-js').default;
 let preferences = {
     channels: [
         'saltyteemo',
-        'chatrooms:50815446:9df7f32a-d7f5-4011-ba56-a81b04851102'
+        // #rules discontinued on 2019-10-13.
+        //'chatrooms:50815446:9df7f32a-d7f5-4011-ba56-a81b04851102'
+        'chuby1tubby'
     ],
     credentials: {
         token: `${process.env.TWITCH_TOKEN}`,
@@ -72,7 +74,7 @@ let notifyTallySent = false,
 
 const commands = {
     "!test": function() {
-        chat.say('MrDestructoid')
+        chat.say('MrDestructoid', preferences.channels[1])
     },
     "!wub": function(arg) {
         let response = "hello";
@@ -101,7 +103,6 @@ const commands = {
     farm: function() {
         timers.farm = process.hrtime();
         chat.send(`PRIVMSG #saltyteemo :!farm`);
-        mostRecentChannel = preferences.channels[1]
     }
 };
 
@@ -111,9 +112,9 @@ const commands = {
  *********************/
 
 // Extends TwitchJS functionality.
-chat.say = limiter(msg => {
+chat.say = limiter((msg, channel) => {
     if (!botState.isPaused) {
-        chat.send(`PRIVMSG #${mostRecentChannel} :${msg}`)
+        chat.send(`PRIVMSG #${channel} :${msg}`)
     }
 }, 1500);
 
@@ -155,7 +156,7 @@ function logCurrentTotals(team, mushrooms, user, message) {
         // A very large bet was detected.
         if (mushrooms >= preferences.largeBetThresholds.massive) {
             // Inform chat that a large bet happened.
-            chat.say('/me PogChamp PogChamp LARGE BET PogChamp PogChamp ' + _extra.replace(' <--  ', '').replace('blue', 'Blue').replace('red', 'Red'))
+            chat.say('/me PogChamp PogChamp LARGE BET PogChamp PogChamp ' + _extra.replace(' <--  ', '').replace('blue', 'Blue').replace('red', 'Red'), preferences.channels[1])
         }
     }
 
@@ -197,7 +198,7 @@ function notifyOneHundredSecondTally() {
         _comparisonSymbol = '<';
 
     // Add extra text to show the large bet and the username.
-    chat.say(`/me GivePLZ GivePLZ 2.5 MIN UPDATE TakeNRG TakeNRG Blue ${_blueAmount} ${_comparisonSymbol} ${_redAmount} Red`)
+    chat.say(`/me GivePLZ GivePLZ 2.5 MIN UPDATE TakeNRG TakeNRG Blue ${_blueAmount} ${_comparisonSymbol} ${_redAmount} Red`, preferences.channels[1])
     console.log(`2 MINUTE UPDATE Blue ${_blueAmount} ${_comparisonSymbol} ${_redAmount} Red`);
 }
 
@@ -313,7 +314,7 @@ function handleSaltbotMessage(channel, username, message) {
 
 // Handle any message sent by my own account.
 function handleMyMessage(channel, username, message) {
-    mostRecentChannel = preferences.channels[1];
+    mostRecentChannel = channel;
 
     const messageSplit = message.split(" ");
     const cmd = messageSplit[0];
@@ -325,7 +326,7 @@ function handleMyMessage(channel, username, message) {
     console.log(`[${getFormattedTime()}] <${colors.cyanBright(username)}> ${message}`)
 
     if (message.toLowerCase() === `@${preferences.credentials.username}`) {
-        chat.say(`VoHiYo`);
+        chat.say(`VoHiYo`, preferences.channels[1]);
     }
 }
 
@@ -348,7 +349,7 @@ function handleOtherMessage(channel, username, message, isWhisper=false) {
     }
 
     if (message.toLowerCase() === `@${preferences.credentials.username}`) {
-        chat.say(`DansGame`);
+        chat.say(`DansGame`, preferences.channels[1]);
     }
 }
 
