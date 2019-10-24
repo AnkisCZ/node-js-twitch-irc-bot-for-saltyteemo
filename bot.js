@@ -149,8 +149,9 @@ const commands = {
 };
 
 
-/*********************
- *********************/
+/*************
+ * Functions *
+ *************/
 
 // Extends TwitchJS functionality.
 chat.say = limiter((msg, channel) => {
@@ -171,9 +172,7 @@ function isBettingOpen() {
 function fetchJSONData() {
     let obj = jsonfile.readFileSync(preferences.fileNames.statisticsDB);
     myStats = obj["myStats"];
-    preferences.betAmount = Math.floor(myStats.currentBalance * preferences.betMultiplier);
-    if (preferences.betAmount < 100)
-        preferences.betAmount = 1000;
+    preferences.betAmount = Math.floor(myStats.currentBalance * preferences.betMultiplier)
 }
 
 // Write statistics to JSON file.
@@ -224,6 +223,12 @@ function notifyBettingEnded() {
     profit = profit.toLocaleString();
     gross = gross.toLocaleString();
 
+    console.log(colors.gray(`\n[${getFormattedTime()}] Betting has ended\n`));
+
+    // Log personal stats after betting ends.
+    console.log(`Your bet: !${myTeam} ${myBet}`);
+    console.log(`Winnings: +${gross} mushrooms (${profit} profit)\n`);
+
     myBet = 0;
     myTeam = '';
     opposingTeam = '';
@@ -231,13 +236,7 @@ function notifyBettingEnded() {
     totals.red.bets = 0;
     totals.blue.bets = 0;
     totals.red.mushrooms = 0;
-    totals.blue.mushrooms = 0;
-
-    console.log(colors.gray(`\n[${getFormattedTime()}] Betting has ended\n`))
-
-    // Log personal stats after betting ends.
-    console.log(`Your bet: !${myTeam} ${myBet}`);
-    console.log(`Winnings: +${gross} mushrooms (${profit} profit)\n`);
+    totals.blue.mushrooms = 0
 }
 
 // Decide how much to bet and which team to bet on.
@@ -266,6 +265,10 @@ function setBettingValues() {
     fetchJSONData();
     myBet = preferences.betAmount;
 
+    // If the bet is too small.
+    if (myBet < 100)
+        myBet = 1000;
+
     // If the odds are close, bet on blue.
     if (lower.mushrooms / higher.mushrooms > 0.80) {
         myTeam = blue;
@@ -280,7 +283,7 @@ function setBettingValues() {
     const minBalance = 1000000;
     const maxBet = myStats.currentBalance - minBalance;
     if (myBet > maxBet)
-        myBet = maxBet;
+        myBet = maxBet
 }
 
 // Create a queue of `fn` calls and execute them in order after `wait` milliseconds.
