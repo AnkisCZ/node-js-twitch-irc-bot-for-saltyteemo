@@ -4,7 +4,6 @@
  *  This version of bot.js handles:
  *      - submitting bets
  *      - farming mushrooms
- *      - sounding alerts
  *      - responding to chuby1tubby in chat
  */
 
@@ -18,7 +17,6 @@ const _ = require('lodash');
 const colors = require('chalk');
 const jsonfile = require('jsonfile');
 const TwitchJS = require('twitch-js').default;
-const player = require('play-sound')(opts = {});
 
 
 /*****************
@@ -37,15 +35,13 @@ let preferences = {
         username: `${process.env.TWITCH_USERNAME}`
     },
     delays: {
-        betting: 178,
+        betting: 170,
         farm: 7200,
         botResponseDefault: 0
     },
-    betAmount: 200,
-    betMultiplier: 0.0075,
+    betAmount: 1000,
+    betMultiplier: 0.33 /* 0.33% */ * 0.01,
     fileNames: {
-        bettingStartedSound: 'media/teemo.mp3',
-        largeBetSound: 'media/nani.mp3',
         statisticsDB: 'data.json',
         cardsAPI: 'cards.json'
     },
@@ -53,7 +49,7 @@ let preferences = {
         regular: 30000,
         massive: 75000
     },
-    mute: false
+    dryRun: false
 };
 
 
@@ -73,7 +69,7 @@ const { chat } = new TwitchJS({
  * Global Properties *
  *********************/
 
-let myBet = 101,
+let myBet = preferences.betAmount,
     myTeam = 'blue',
     opposingTeam = 'red',
     betComplete = false,
@@ -126,25 +122,34 @@ const commands = {
         commands.bet('blue', myBet)
     },
     "saltyt1Blue": function() {
-        setBettingValues();
-        commands.bet('blue', myBet)
+        commands["!blue"]();
     },
     "!red": function() {
         setBettingValues();
         commands.bet('red', myBet)
     },
     "saltyt1Red": function() {
-        setBettingValues();
-        commands.bet('red', myBet)
+        commands["!red"]();
     },
     farm: function() {
         timers.farm = process.hrtime();
         chat.say('!farm', preferences.channels[0])
     },
     bet: function(team, amount) {
+        console.log(`bet() function was called with parameters: team=${team} amount=${amount}`);
+
         let _team = (team === 'blue') ? 'saltyt1Blue' : 'saltyt1Red';
+        console.log(`_team = ${_team}`);
+
+        if (!preferences.dryRun) {
+            chat.say(`${_team} ${amount}`, preferences.channels[0])
+            console.log(`Bet attempted: ${_team} ${amount}`);
+        } else {
+            console.log('Next line: dry run bet team and amount');
+            console.log(`Dry run bet: ${_team} ${amount}`);
+        }
+
         betComplete = true;
-        chat.say(`${_team} ${amount}`, preferences.channels[0])
     }
 };
 
@@ -204,13 +209,6 @@ function logCurrentTotals(team, mushrooms, user, message) {
 
         // Add extra text to show the large bet and the username.
         _extra = ` <--  <${user}> ${team} ${_largeAmount} (balance: ${_balance} mushrooms)`;
-
-        // A very large bet was detected.
-        if (mushrooms >= preferences.largeBetThresholds.massive) {
-            // Play audio file.
-            if (!preferences.mute)
-                player.play(preferences.fileNames.largeBetSound, function(err) { if (err && !err.killed) throw err });
-        }
     }
 
     console.log(pad(_blue, 34) + ' | ' + pad(pad(34, _red), 33) + pad(16, seconds) + colors.bold(_extra))
@@ -265,25 +263,24 @@ function setBettingValues() {
     fetchJSONData();
     myBet = preferences.betAmount;
 
-    // If the bet is too small.
-    if (myBet < 100)
-        myBet = 1000;
-
     // If the odds are close, bet on blue.
     if (lower.mushrooms / higher.mushrooms > 0.80) {
         myTeam = blue;
         opposingTeam = red
+        console.log(`Falling back to blue team.`);
     }
 
-    // If the odds are close, lower my bet amount accordingly.
-    if (myBet > lower.mushrooms || myBet > higher.mushrooms - lower.mushrooms)
-        myBet = Math.ceil(myBet / 2);
-
-    // Finally, if the bet would bring my balance below 'x' shrooms, reduce the bet amount.
-    const minBalance = 1000000;
+    // If the bet would bring my balance below 'x' shrooms, reduce the bet amount.
+    const minBalance = 2000000;
     const maxBet = myStats.currentBalance - minBalance;
-    if (myBet > maxBet)
+    if (myBet > maxBet) {
         myBet = maxBet
+    }
+
+    // If the bet is too small.
+    if (myBet < 100 || myBet === 'NaN' || myBet === undefined) {
+        myBet = 1000;
+    }
 }
 
 // Create a queue of `fn` calls and execute them in order after `wait` milliseconds.
@@ -340,11 +337,6 @@ function handleSaltbotMessage(channel, username, message) {
         if (!isBettingOpen()) {
             // Record time of first bet.
             timers.firstBet = process.hrtime();
-
-            // Play audio file.
-            if (!preferences.mute)
-                player.play(preferences.fileNames.bettingStartedSound, function(err) { if (err && !err.killed) throw err });
-
             console.log(colors.greenBright(`\n[${getFormattedTime()}] Betting has started\n`))
         }
 
@@ -457,4 +449,5 @@ chat.connect()
 
         console.clear();
         console.log(colors.greenBright('Connection established\n'))
+        console.log(`Betting dry run ${preferences.dryRun ? 'enabled' : 'disabled'}`);
     });
