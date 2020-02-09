@@ -5,6 +5,7 @@
  *      - submitting bets
  *      - farming mushrooms
  *      - responding to chuby1tubby in chat
+ *      - monitoring chat in saltyteemo
  */
 
 /*******************
@@ -26,8 +27,6 @@ const TwitchJS = require('twitch-js').default;
 let preferences = {
     channels: [
         'saltyteemo',
-        // #rules discontinued on 2019-10-13.
-        //'chatrooms:50815446:9df7f32a-d7f5-4011-ba56-a81b04851102'
         'chuby1tubby'
     ],
     credentials: {
@@ -39,7 +38,7 @@ let preferences = {
         farm: 7200,
         botResponseDefault: 0
     },
-    betAmount: 1000,
+    betAmount: 100,
     betMultiplier: 0.33 /* 0.33% */ * 0.01,
     fileNames: {
         statisticsDB: 'data.json',
@@ -136,16 +135,11 @@ const commands = {
         chat.say('!farm', preferences.channels[0])
     },
     bet: function(team, amount) {
-        console.log(`bet() function was called with parameters: team=${team} amount=${amount}`);
-
         let _team = (team === 'blue') ? 'saltyt1Blue' : 'saltyt1Red';
-        console.log(`_team = ${_team}`);
-
         if (!preferences.dryRun) {
             chat.say(`${_team} ${amount}`, preferences.channels[0])
             console.log(`Bet attempted: ${_team} ${amount}`);
         } else {
-            console.log('Next line: dry run bet team and amount');
             console.log(`Dry run bet: ${_team} ${amount}`);
         }
 
@@ -216,16 +210,17 @@ function logCurrentTotals(team, mushrooms, user, message) {
 
 // Resets global betting properties and logs the time and other information.
 function notifyBettingEnded() {
-    let profit = Math.floor(myBet / totals[myTeam].mushrooms * totals[opposingTeam].mushrooms);
-    let gross = profit + myBet;
-    profit = profit.toLocaleString();
-    gross = gross.toLocaleString();
-
     console.log(colors.gray(`\n[${getFormattedTime()}] Betting has ended\n`));
 
     // Log personal stats after betting ends.
-    console.log(`Your bet: !${myTeam} ${myBet}`);
-    console.log(`Winnings: +${gross} mushrooms (${profit} profit)\n`);
+    const profit = Math.floor(myBet / totals[myTeam].mushrooms * totals[opposingTeam].mushrooms);
+    const gross = profit + myBet;
+    const personalStats =   `My bet: !${myTeam} ${myBet}\n` + 
+                            `Winnings: +${gross.toLocaleString()} mushrooms (${profit.toLocaleString()} profit)\n` + 
+                            `Current Balance: ${(myStats.currentBalance - myBet).toLocaleString()} mushrooms\n` +
+                            `Winning Balance: ${(myStats.currentBalance + profit).toLocaleString()} mushrooms\n`;
+
+    console.log(colors.bold(personalStats));
 
     myBet = 0;
     myTeam = '';
@@ -272,14 +267,14 @@ function setBettingValues() {
 
     // If the bet would bring my balance below 'x' shrooms, reduce the bet amount.
     const minBalance = 2000000;
-    const maxBet = myStats.currentBalance - minBalance;
+    const maxBet = Math.floor((myStats.currentBalance - minBalance) / 5);
     if (myBet > maxBet) {
         myBet = maxBet
     }
 
-    // If the bet is too small.
-    if (myBet < 100 || myBet === 'NaN' || myBet === undefined) {
-        myBet = 1000;
+    // If the bet is too small or not a valid number.
+    if (myBet < 350 || myBet === 'NaN' || myBet === undefined) {
+        myBet = 350;
     }
 }
 
@@ -418,9 +413,10 @@ function handleOtherMessage(channel, username, message, isWhisper=false) {
  * TwitchJS Finalization *
  *************************/
 
-// Listen for all user and bot messages.
+// Listen for all public messages from users and bots.
 chat.on('PRIVMSG', (msg) => {
-    let params = [msg.channel.replace("#", ""), msg.username, msg.message];
+    msg.channel = msg.channel.replace("#", "");
+    let params = [msg.channel, msg.username, msg.message];
 
     // Listen for specific users and bots.
     switch (msg.username) {
