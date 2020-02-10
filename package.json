@@ -15,7 +15,7 @@
   },
   "devDependencies": {},
   "scripts": {
-    "start": "node bot.js"
+    "start": "supervisor bot.js"
   },
   "author": "Kyle Nakamura",
   "license": "ISC"

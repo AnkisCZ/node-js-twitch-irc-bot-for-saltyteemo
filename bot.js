@@ -217,8 +217,8 @@ function notifyBettingEnded() {
     const gross = profit + myBet;
     const personalStats =   `My bet: !${myTeam} ${myBet}\n` + 
                             `Winnings: +${gross.toLocaleString()} mushrooms (${profit.toLocaleString()} profit)\n` + 
-                            `Current Balance: ${(myStats.currentBalance - myBet).toLocaleString()} mushrooms\n` +
-                            `Winning Balance: ${(myStats.currentBalance + profit).toLocaleString()} mushrooms\n`;
+                            `Current Balance: ${(myStats.currentBalance).toLocaleString()} mushrooms\n` +
+                            `Winning Balance: ${(myStats.currentBalance + gross).toLocaleString()} mushrooms\n`;
 
     console.log(colors.bold(personalStats));
 
