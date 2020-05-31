@@ -30,8 +30,8 @@ let preferences = {
         'chuby1tubby'
     ],
     credentials: {
-        token: `${process.env.TWITCH_PASSWORD}`,
-        username: `${process.env.TWITCH_USERNAME}`
+        username: `${process.env.TWITCH_USERNAME}`,
+        token: `${process.env.TWITCH_PASSWORD}`
     },
     delays: {
         betting: 170,
@@ -39,13 +39,13 @@ let preferences = {
         botResponseDefault: 0
     },
     betAmount: 100,
-    betMultiplier: 0.33 /* 0.33% */ * 0.01,
+    betMultiplier: 0.4 /* 0.4% */ * 0.01,
     fileNames: {
         statisticsDB: 'data.json',
         cardsAPI: 'cards.json'
     },
     largeBetThresholds: {
-        regular: 30000,
+        regular: 25000,
         massive: 75000
     },
     dryRun: false
